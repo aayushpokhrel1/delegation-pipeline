@@ -171,6 +171,34 @@ The orchestrator protocol lives in your global `~/.claude/CLAUDE.md`. In short:
 Delegate bulk mechanical work (boilerplate, repetitive edits, docstrings, first drafts).
 Keep design, tricky debugging, and security-sensitive code in the Claude session.
 
+### Proactive delegation (no `/delegate` needed)
+
+The orchestrator (Opus) is set up to delegate **on its own** whenever a request contains
+qualifying grunt work, without you typing `/delegate`. It announces the backend/model in
+one line, runs the worker, reviews the diff, and folds the result in. `/delegate` and
+saying "delegate this" still work as manual triggers; they're just not required. Say
+**"don't delegate this"** to keep a task (or a sensitive repo) in-session.
+
+Note: delegating sends repo content to external model providers (`deepseek`/`nvidia` are
+remote; `free`/OmniRoute routes out too). That's the intended trade; disable it per-repo
+when the code is sensitive.
+
+This behavior lives in your **global `~/.claude/CLAUDE.md`**, not in this repo, so it
+travels with that file, not with a clone. To enable it on another device, add a block like
+this to that device's `~/.claude/CLAUDE.md`:
+
+```markdown
+# Delegation to cheap-model workers
+Use `~/.claude/bin/delegate <backend> [--model <id>] "<task>"` to offload grunt work.
+Delegate proactively (no /delegate needed): announce the backend/model in one line, run
+the worker, then review the git diff. You route: prefer `free`, use `nvidia` when free is
+dry (tool-calling models only, see MODELS.md), `deepseek` for reliability-sensitive work.
+Keep design, tricky debugging, security-sensitive code, and one-liners in-session. Stop if
+told "don't delegate this".
+```
+
+(The full version is in this repo's git history / the author's own CLAUDE.md.)
+
 ## Tools the worker has
 
 `list_dir`, `find_files`, `read_file`, `search_text`, `write_file`, `edit_file`.
