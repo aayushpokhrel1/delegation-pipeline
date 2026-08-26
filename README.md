@@ -44,12 +44,55 @@ seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the
   ```bash
   npx omniroute      # serves http://localhost:20128/v1
   ```
+  Or have it start automatically at every logon (Windows), see
+  [Autostart](#autostart-windows) below.
 - **deepseek / kimi**: set env vars, or paste the key into `delegate.config.json`
   (that file is git-ignored):
   ```bash
   export DEEPSEEK_API_KEY=sk-...
   export MOONSHOT_API_KEY=sk-...
   ```
+
+### Autostart (Windows)
+
+So you never have to start the gateway by hand:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
+```
+
+This registers a Scheduled Task ("OmniRoute Gateway") that launches OmniRoute hidden at
+every logon (15s delay so the network is up). It's idempotent, it won't start a second
+copy if one is already running. Manage it:
+
+```powershell
+Start-ScheduledTask -TaskName "OmniRoute Gateway"                 # start now, no reboot
+powershell -ExecutionPolicy Bypass -File scripts\uninstall-autostart.ps1   # remove
+```
+
+Logs land in `~/.claude/omniroute.log`. The launcher prefers a global `omniroute`
+(`npm i -g omniroute`) and falls back to `npx --yes omniroute`.
+
+### Widening the free pool (recommended)
+
+OmniRoute ships with only a couple of keyless free providers (OpenCode Zen, Felo). Their
+shared quota is frequently exhausted (`403 insufficient_quota` / `429`), which makes the
+bare `free` backend unreliable. Add your own **free-tier** API keys so the router has
+healthy routes to fall back to. All of these give a free key at signup:
+
+| Provider          | Free tier                    | Get a key                         |
+|-------------------|------------------------------|-----------------------------------|
+| **Groq**          | Fast, generous free tier     | https://console.groq.com/keys     |
+| **Cerebras**      | ~1M tokens/day free          | https://cloud.cerebras.ai         |
+| **Google Gemini** | Free tier (Flash models)     | https://aistudio.google.com/apikey |
+| **Mistral**       | Free experiment tier         | https://console.mistral.ai        |
+| **OpenRouter**    | `:free` models               | https://openrouter.ai/keys        |
+| **GitHub Models** | Free (rate-limited)          | GitHub settings → developer token |
+
+Add them in the OmniRoute dashboard (open `http://localhost:20128` → provider/keys page,
+keys are encrypted at rest), or via CLI (`omniroute keys`). Groq + Cerebras + Gemini alone
+make `free` solidly usable for grunt work. When free is dry, `deepseek` remains the
+reliable paid-but-cheap fallback.
 
 ## Use it
 
