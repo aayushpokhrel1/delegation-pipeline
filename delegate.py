@@ -348,6 +348,51 @@ def run_tool(name, args):
 # HTTP: OpenAI-compatible chat/completions
 # --------------------------------------------------------------------------- #
 
+def _parse_response(raw):
+    """Return a response dict from either a plain JSON body or an SSE stream.
+
+    Most endpoints (and any honoring stream:false) return one JSON object. Some free
+    routes stream `data: {...}` chunks regardless; reassemble those into the same shape.
+    """
+    raw = raw.lstrip()
+    if not raw.startswith("data:"):
+        return json.loads(raw)
+
+    content_parts = []
+    tool_calls = {}  # index -> {id, function:{name, arguments}}
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[len("data:"):].strip()
+        if payload == "[DONE]" or not payload:
+            continue
+        try:
+            chunk = json.loads(payload)
+        except ValueError:
+            continue
+        delta = chunk.get("choices", [{}])[0].get("delta", {})
+        if delta.get("content"):
+            content_parts.append(delta["content"])
+        for tc in delta.get("tool_calls", []) or []:
+            idx = tc.get("index", 0)
+            slot = tool_calls.setdefault(
+                idx, {"id": tc.get("id", f"call_{idx}"), "type": "function",
+                      "function": {"name": "", "arguments": ""}}
+            )
+            if tc.get("id"):
+                slot["id"] = tc["id"]
+            fn = tc.get("function", {})
+            if fn.get("name"):
+                slot["function"]["name"] = fn["name"]
+            if fn.get("arguments"):
+                slot["function"]["arguments"] += fn["arguments"]
+    message = {"role": "assistant", "content": "".join(content_parts)}
+    if tool_calls:
+        message["tool_calls"] = [tool_calls[i] for i in sorted(tool_calls)]
+    return {"choices": [{"message": message}]}
+
+
 def chat_completion(backend, messages, timeout):
     url = backend["base_url"].rstrip("/") + "/chat/completions"
     body = {
@@ -355,6 +400,9 @@ def chat_completion(backend, messages, timeout):
         "messages": messages,
         "tools": TOOLS_SPEC,
         "tool_choice": "auto",
+        # Force a single JSON body. Some gateways (e.g. OmniRoute's free routes)
+        # stream SSE chunks unless told otherwise, which we can't parse here.
+        "stream": False,
         "temperature": backend.get("temperature", DEFAULT_CONFIG["temperature"]),
         "max_tokens": backend.get("max_tokens", DEFAULT_CONFIG["max_tokens"]),
     }
@@ -368,7 +416,8 @@ def chat_completion(backend, messages, timeout):
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                raw = resp.read().decode("utf-8")
+            return _parse_response(raw)
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
             last_err = f"HTTP {e.code}: {detail}"
