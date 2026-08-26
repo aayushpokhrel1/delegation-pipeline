@@ -14,11 +14,12 @@ orchestrator) review the resulting `git diff` and commit.
 
 ## Backends
 
-| Backend    | Provider              | Cost    | Notes                                    |
-|------------|-----------------------|---------|------------------------------------------|
-| `free`     | OmniRoute (local)     | $0      | Local gateway, `auto/coding` model       |
-| `deepseek` | DeepSeek API          | cheap   | Reliable; good default for real work     |
-| `kimi`     | Kimi / Moonshot API   | premium | Strongest; use when quality matters      |
+| Backend    | Provider              | Cost         | Notes                                    |
+|------------|-----------------------|--------------|------------------------------------------|
+| `free`     | OmniRoute (local)     | $0           | Local gateway, `auto/coding` model       |
+| `nvidia`   | NVIDIA API Catalog    | free credits | build.nvidia.com; strong models, free tier |
+| `deepseek` | DeepSeek API          | cheap        | Reliable; good default for real work     |
+| `kimi`     | Kimi / Moonshot API   | premium      | Strongest; use when quality matters      |
 
 All three are just an OpenAI-compatible base URL + model + key, configured in
 `~/.claude/delegate.config.json`.
@@ -52,6 +53,19 @@ seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the
   export DEEPSEEK_API_KEY=sk-...
   export MOONSHOT_API_KEY=sk-...
   ```
+- **nvidia**: get a free key at https://build.nvidia.com (any model page → "Get API Key",
+  it starts with `nvapi-`), then:
+  ```bash
+  export NVIDIA_API_KEY=nvapi-...
+  ```
+  The `nvidia` backend is OpenAI-compatible via `https://integrate.api.nvidia.com/v1`.
+  It defaults to `meta/llama-3.3-70b-instruct` (supports the tool-calling the worker needs);
+  override per run with `--model`, e.g. `--model deepseek-ai/deepseek-r1` or a Nemotron/Qwen
+  id from the catalog. This is a great **free** path when OmniRoute's keyless routes are dry.
+
+  You can also plug NVIDIA into OmniRoute itself (so the `free`/`auto` router can use it):
+  open `http://localhost:20128` → provider keys → add the NVIDIA key. Either way works;
+  the direct `nvidia` backend is the more predictable of the two.
 
 ### Autostart
 

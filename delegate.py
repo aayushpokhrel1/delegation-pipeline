@@ -48,6 +48,11 @@ DEFAULT_CONFIG = {
             "api_key_env": "MOONSHOT_API_KEY",
             "model": "kimi-k2-0711-preview",
         },
+        "nvidia": {
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "api_key_env": "NVIDIA_API_KEY",
+            "model": "meta/llama-3.3-70b-instruct",
+        },
     },
     "max_steps": 40,
     "temperature": 0.2,
