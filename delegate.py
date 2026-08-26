@@ -398,6 +398,26 @@ def _parse_response(raw):
     return {"choices": [{"message": message}]}
 
 
+def list_models(backend, timeout):
+    """Print the model ids the backend exposes (GET /models)."""
+    url = backend["base_url"].rstrip("/") + "/models"
+    headers = {}
+    if backend.get("api_key"):
+        headers["Authorization"] = f"Bearer {backend['api_key']}"
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        die(f"listing models failed: HTTP {e.code}: {e.read().decode('utf-8','replace')[:300]}")
+    except (urllib.error.URLError, TimeoutError) as e:
+        die(f"listing models failed: {e}")
+    ids = sorted(m.get("id", "") for m in data.get("data", []) if m.get("id"))
+    for i in ids:
+        print(i)
+    log(f"delegate: {len(ids)} model(s) available on backend")
+
+
 def chat_completion(backend, messages, timeout):
     url = backend["base_url"].rstrip("/") + "/chat/completions"
     body = {
@@ -523,11 +543,14 @@ def main():
         prog="delegate",
         description="Run a headless cheap-model worker over the current repo.",
     )
-    parser.add_argument("backend", help="Backend name (free, deepseek, kimi, ...)")
-    parser.add_argument("task", help="The task instruction for the worker")
+    parser.add_argument("backend", help="Backend name (free, nvidia, deepseek, kimi, ...)")
+    parser.add_argument("task", nargs="?", default=None,
+                        help="The task instruction for the worker")
     parser.add_argument("--dir", default=None, help="Repo root (default: cwd)")
     parser.add_argument("--model", default=None, help="Override the model id")
     parser.add_argument("--max-steps", type=int, default=None, help="Max agent steps")
+    parser.add_argument("--list-models", action="store_true",
+                        help="List the models this backend exposes, then exit")
     args = parser.parse_args()
 
     global ROOT
@@ -544,6 +567,12 @@ def main():
     backend.setdefault("max_tokens", cfg.get("max_tokens"))
     max_steps = args.max_steps or cfg.get("max_steps", 40)
     timeout = cfg.get("request_timeout", 180)
+
+    if args.list_models:
+        list_models(backend, timeout)
+        return
+    if not args.task:
+        die("a task is required (or pass --list-models to browse the catalog)")
 
     log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}")
     summary = agent_loop(backend, args.task, max_steps, timeout)

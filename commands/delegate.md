@@ -1,6 +1,6 @@
 ---
 description: Hand a mechanical task to a free/cheap model worker, then review its diff
-argument-hint: <free|deepseek|kimi> <task description>
+argument-hint: [free|nvidia|deepseek|kimi] <task description>
 allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
 
@@ -10,8 +10,23 @@ usage as possible on the grunt work itself.
 
 Arguments: `$ARGUMENTS`
 
-The first whitespace-delimited token is the **backend** (`free`, `deepseek`, or `kimi`);
-everything after it is the **task**. If no backend is given, default to `free`.
+If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `deepseek`,
+`kimi`), use it and treat the rest as the **task**. Otherwise treat the whole thing as the
+task and **you choose the backend and model yourself** based on the task.
+
+**You are the router.** Size up the task and pick:
+- **Backend:** `free` (OmniRoute, $0) when its pool is healthy; `nvidia` (free trial
+  credits, strong tool-calling models) when free is dry; `deepseek` for
+  reliability-sensitive or trickier work; `kimi` only if the user asked.
+- **Model (mainly for `nvidia`):** pass `--model <id>` matched to the task. Read
+  `MODELS.md` in this repo for the task->model shortlist, and run
+  `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick
+  tool-calling-capable models (the worker edits via function calls); when unsure, use the
+  backend default. Good starting points on `nvidia`: `qwen/qwen2.5-coder-32b-instruct` for
+  code, `meta/llama-3.1-8b-instruct` for cheap/trivial bulk, `meta/llama-3.3-70b-instruct`
+  (default) otherwise.
+
+State which backend and model you chose and why in one line before running.
 
 Follow this protocol:
 
@@ -21,9 +36,9 @@ Follow this protocol:
 2. **Write a tight spec.** The worker has zero conversation context, so expand the task
    into a self-contained instruction: name the exact files, describe the change precisely,
    and point at a pattern to mirror if one exists. Do this reasoning yourself, cheaply.
-3. **Run the worker:**
+3. **Run the worker** with your chosen backend and (optionally) model:
    ```
-   ~/.claude/bin/delegate <backend> "<your expanded self-contained instruction>"
+   ~/.claude/bin/delegate <backend> [--model <id>] "<your expanded self-contained instruction>"
    ```
    Its step logs go to stderr and its summary to stdout.
 4. **Review.** Run `git diff` and actually read the changes. The worker cannot run shell,

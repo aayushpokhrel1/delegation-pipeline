@@ -131,7 +131,17 @@ reliable paid-but-cheap fallback.
 
 Step logs stream to **stderr**; the final **summary** prints to **stdout**.
 
-Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override), `--max-steps N`.
+Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override),
+`--max-steps N`, `--list-models` (print the backend's catalog and exit).
+
+### Letting Claude pick the model
+
+The tool never auto-selects a model beyond each backend's default, that's the
+orchestrator's job. When you run `/delegate` (or Opus drives the raw CLI), Claude sizes up
+the task and chooses the backend and, for `nvidia`, the `--model`, using `--list-models`
+to see the live catalog and [`MODELS.md`](MODELS.md) as the task->model shortlist. Only
+tool-calling-capable models are picked, since the worker edits via function calls. You can
+still force a specific backend/model by naming them.
 
 ### From inside Claude Code: `/delegate`
 
