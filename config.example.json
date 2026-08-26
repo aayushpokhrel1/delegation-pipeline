@@ -18,7 +18,7 @@
     "nvidia": {
       "base_url": "https://integrate.api.nvidia.com/v1",
       "api_key_env": "NVIDIA_API_KEY",
-      "model": "meta/llama-3.3-70b-instruct"
+      "model": "deepseek-ai/deepseek-v4-flash-0731"
     }
   },
   "max_steps": 40,

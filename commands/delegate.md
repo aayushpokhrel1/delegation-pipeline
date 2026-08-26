@@ -22,9 +22,9 @@ task and **you choose the backend and model yourself** based on the task.
   `MODELS.md` in this repo for the task->model shortlist, and run
   `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick
   tool-calling-capable models (the worker edits via function calls); when unsure, use the
-  backend default. Good starting points on `nvidia`: `qwen/qwen2.5-coder-32b-instruct` for
-  code, `meta/llama-3.1-8b-instruct` for cheap/trivial bulk, `meta/llama-3.3-70b-instruct`
-  (default) otherwise.
+  backend default. Verified `nvidia` picks: `deepseek-ai/deepseek-v4-flash-0731` (default,
+  fast/cheap), `nvidia/nemotron-3-super-120b-a12b` (quality), `nvidia/nemotron-3-nano-30b-a3b`
+  (small). The catalog changes, so `--list-models` if a pick 404s or 410s.
 
 State which backend and model you chose and why in one line before running.
 

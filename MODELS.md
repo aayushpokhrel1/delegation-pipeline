@@ -13,18 +13,23 @@ without editing, so avoid them for edit tasks. When unsure, fall back to the def
 
 ## NVIDIA backend: task -> model
 
-Live list any time: `delegate nvidia --list-models`. Sensible picks:
+**Always verify with `delegate nvidia --list-models` first, the catalog changes often.**
+Models reach end-of-life on a date and then return `HTTP 410 Gone` (e.g.
+`meta/llama-3.3-70b-instruct` EOL'd 2026-08-26), and some catalog ids return
+`HTTP 404 "not found for account"` because they aren't enabled for your key. The tool
+surfaces these errors clearly, just pick another id and retry.
 
-| Task shape                                   | Model (`--model ...`)                     | Tools |
-|----------------------------------------------|-------------------------------------------|-------|
-| **Default / general edits** (safe pick)      | `meta/llama-3.3-70b-instruct`             | yes   |
-| **Code-heavy** refactors, generation         | `qwen/qwen2.5-coder-32b-instruct`         | yes   |
-| **Cheap / fast / trivial** bulk edits        | `meta/llama-3.1-8b-instruct`              | yes   |
-| **Bigger reasoning, still tool-capable**     | `nvidia/llama-3.1-nemotron-70b-instruct`  | yes   |
-| **Highest quality** (slow, credit-hungry)    | `meta/llama-3.1-405b-instruct`            | yes   |
+Verified working (tool-calling drives the edit loop) as of 2026-08-26:
 
-(Model ids come from the catalog and can change; verify with `--list-models`. The `yes`
-column is the expected default; confirm with a one-file smoke test before a big run.)
+| Task shape                                | Model (`--model ...`)                  | Notes                        |
+|-------------------------------------------|----------------------------------------|------------------------------|
+| **Default / fast** (cheap, clean, 3 steps)| `deepseek-ai/deepseek-v4-flash-0731`   | backend default; great pick  |
+| **Highest quality**                       | `nvidia/nemotron-3-super-120b-a12b`     | strong, more credits         |
+| **Small / cheap** bulk                    | `nvidia/nemotron-3-nano-30b-a3b`        | works, less efficient        |
+
+Do NOT rely on the older `meta/llama-*`, `qwen*`, `mistralai/*-instruct` ids from earlier
+NVIDIA docs, on this account they 404 or have EOL'd. Confirm any new pick with a one-file
+smoke test before a big run.
 
 ## Which backend first
 

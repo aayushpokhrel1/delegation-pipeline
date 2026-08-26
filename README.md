@@ -59,9 +59,10 @@ seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the
   export NVIDIA_API_KEY=nvapi-...
   ```
   The `nvidia` backend is OpenAI-compatible via `https://integrate.api.nvidia.com/v1`.
-  It defaults to `meta/llama-3.3-70b-instruct` (supports the tool-calling the worker needs);
-  override per run with `--model`, e.g. `--model deepseek-ai/deepseek-r1` or a Nemotron/Qwen
-  id from the catalog. This is a great **free** path when OmniRoute's keyless routes are dry.
+  It defaults to `deepseek-ai/deepseek-v4-flash-0731` (fast, verified tool-calling);
+  override per run with `--model`, e.g. `--model nvidia/nemotron-3-super-120b-a12b` for more
+  quality. The catalog changes (models EOL or are account-gated), so use `--list-models` and
+  see [`MODELS.md`](MODELS.md). This is a great **free** path when OmniRoute's routes are dry.
 
   You can also plug NVIDIA into OmniRoute itself (so the `free`/`auto` router can use it):
   open `http://localhost:20128` → provider keys → add the NVIDIA key. Either way works;
