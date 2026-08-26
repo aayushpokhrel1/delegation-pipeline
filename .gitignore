@@ -1,0 +1,6 @@
+# Never commit real API keys or per-machine config
+delegate.config.json
+*.local.json
+.env
+__pycache__/
+*.pyc

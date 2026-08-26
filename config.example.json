@@ -1,0 +1,23 @@
+{
+  "backends": {
+    "free": {
+      "base_url": "http://localhost:20128/v1",
+      "api_key": "",
+      "model": "auto/coding"
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "model": "deepseek-chat"
+    },
+    "kimi": {
+      "base_url": "https://api.moonshot.ai/v1",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "model": "kimi-k2-0711-preview"
+    }
+  },
+  "max_steps": 40,
+  "temperature": 0.2,
+  "max_tokens": 4096,
+  "request_timeout": 180
+}
