@@ -53,25 +53,35 @@ seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the
   export MOONSHOT_API_KEY=sk-...
   ```
 
-### Autostart (Windows)
+### Autostart
 
-So you never have to start the gateway by hand:
+So you never have to start the gateway by hand. Logs land in `~/.claude/omniroute.log`,
+and every installer prefers a global `omniroute` (`npm i -g omniroute`) and falls back to
+`npx --yes omniroute`.
 
+**Windows** (Scheduled Task, launches hidden at logon):
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
-```
-
-This registers a Scheduled Task ("OmniRoute Gateway") that launches OmniRoute hidden at
-every logon (15s delay so the network is up). It's idempotent, it won't start a second
-copy if one is already running. Manage it:
-
-```powershell
 Start-ScheduledTask -TaskName "OmniRoute Gateway"                 # start now, no reboot
 powershell -ExecutionPolicy Bypass -File scripts\uninstall-autostart.ps1   # remove
 ```
 
-Logs land in `~/.claude/omniroute.log`. The launcher prefers a global `omniroute`
-(`npm i -g omniroute`) and falls back to `npx --yes omniroute`.
+**macOS** (launchd agent, `RunAtLoad` + `KeepAlive` so it restarts if it dies):
+```bash
+bash scripts/install-autostart.sh          # starts immediately and at every login
+bash scripts/uninstall-autostart.sh        # remove
+```
+
+**Linux** (systemd `--user` service, restarts on failure):
+```bash
+bash scripts/install-autostart.sh          # enable + start now, and at every login
+sudo loginctl enable-linger "$USER"        # optional: keep running without an active login
+bash scripts/uninstall-autostart.sh        # remove
+```
+
+All installers are idempotent, they won't start a second copy if one is already running.
+For a one-off manual start on macOS/Linux without installing autostart, use
+`bash scripts/start-omniroute.sh`.
 
 ### Widening the free pool (recommended)
 
