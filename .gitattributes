@@ -1,0 +1,4 @@
+# Keep shell scripts LF so shebangs work when cloned on Linux/macOS.
+*.sh text eol=lf
+delegate.py text eol=lf
+*.ps1 text eol=crlf
