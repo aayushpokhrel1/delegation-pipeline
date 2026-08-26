@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 $RepoDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClaudeDir = Join-Path $HOME ".claude"
 $BinDir    = Join-Path $ClaudeDir "bin"
+$CmdDir    = Join-Path $ClaudeDir "commands"
 $Config    = Join-Path $ClaudeDir "delegate.config.json"
 
 # Find a Python 3 interpreter.
@@ -40,6 +41,10 @@ if (-not (Test-Path $Config)) {
 } else {
     Write-Host "config exists      -> $Config (left unchanged)"
 }
+
+New-Item -ItemType Directory -Force -Path $CmdDir | Out-Null
+Copy-Item (Join-Path $RepoDir "commands\delegate.md") (Join-Path $CmdDir "delegate.md") -Force
+Write-Host "installed command  -> $CmdDir\delegate.md  (use /delegate in Claude Code)"
 
 Write-Host ""
 Write-Host "Done. Test it:"

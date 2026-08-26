@@ -6,6 +6,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 BIN_DIR="$CLAUDE_DIR/bin"
+CMD_DIR="$CLAUDE_DIR/commands"
 LAUNCHER="$BIN_DIR/delegate"
 CONFIG="$CLAUDE_DIR/delegate.config.json"
 
@@ -36,6 +37,10 @@ if [ ! -f "$CONFIG" ]; then
 else
   echo "config exists   -> $CONFIG (left unchanged)"
 fi
+
+mkdir -p "$CMD_DIR"
+cp "$REPO_DIR/commands/delegate.md" "$CMD_DIR/delegate.md"
+echo "installed command -> $CMD_DIR/delegate.md  (use /delegate in Claude Code)"
 
 echo
 echo "Done. Test it:"

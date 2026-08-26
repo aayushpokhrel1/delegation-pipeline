@@ -66,6 +66,20 @@ Step logs stream to **stderr**; the final **summary** prints to **stdout**.
 
 Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override), `--max-steps N`.
 
+### From inside Claude Code: `/delegate`
+
+The installer also drops a `/delegate` slash command into `~/.claude/commands/`, so you can
+trigger a delegation without leaving your Claude session:
+
+```
+/delegate deepseek Add type hints to every function in src/parser.py
+/delegate free Write a docstring for each exported function in utils/
+```
+
+The command has Claude expand your request into a tight, self-contained spec, run the
+worker, then review the resulting `git diff` and report back. First token is the backend
+(`free` if omitted); the rest is the task.
+
 ## How Claude should drive it
 
 The orchestrator protocol lives in your global `~/.claude/CLAUDE.md`. In short:
