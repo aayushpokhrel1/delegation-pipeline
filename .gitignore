@@ -4,3 +4,6 @@ delegate.config.json
 .env
 __pycache__/
 *.pyc
+
+# graphify generated knowledge graph (local artifact)
+graphify-out/
