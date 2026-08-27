@@ -2,3 +2,4 @@
 *.sh text eol=lf
 delegate.py text eol=lf
 *.ps1 text eol=crlf
+graphify-out/graph.json merge=graphify
