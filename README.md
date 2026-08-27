@@ -262,8 +262,8 @@ post-checkout rebuild the graph; hooks live in `.git/` and are never version-con
 graphify hook install
 ```
 
-Note: the paths in `.claude/settings.json` point at the author's `graphify` binary; adjust
-them to your own install location if the hook-guard errors on another machine.
+The `.claude/settings.json` hook-guard invokes `graphify` from your `PATH`, so it's
+portable across machines as long as graphify is installed and on `PATH`.
 
 ## License
 
