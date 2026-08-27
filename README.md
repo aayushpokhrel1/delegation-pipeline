@@ -127,7 +127,8 @@ reliable paid-but-cheap fallback.
 
 # real grunt work
 ~/.claude/bin/delegate deepseek "Add type hints to every function in src/parser.py"
-~/.claude/bin/delegate free "Write a docstring for each exported function in utils/*.js"
+~/.claude/bin/delegate free --model auto/cheap "Write a docstring for each function in utils/"
+~/.claude/bin/delegate nvidia "Convert callbacks to async/await in api/client.py"
 ```
 
 Step logs stream to **stderr**; the final **summary** prints to **stdout**.
@@ -138,11 +139,20 @@ Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override),
 ### Letting Claude pick the model
 
 The tool never auto-selects a model beyond each backend's default, that's the
-orchestrator's job. When you run `/delegate` (or Opus drives the raw CLI), Claude sizes up
-the task and chooses the backend and, for `nvidia`, the `--model`, using `--list-models`
-to see the live catalog and [`MODELS.md`](MODELS.md) as the task->model shortlist. Only
-tool-calling-capable models are picked, since the worker edits via function calls. You can
-still force a specific backend/model by naming them.
+orchestrator's job. When you say "delegate" (or run `/delegate`, or Opus drives the raw CLI
+on its own), Claude sizes up the task and chooses **both the backend and the model/route**,
+using `--list-models` to see the live catalog and [`MODELS.md`](MODELS.md) as the shortlist.
+Two flavors of choice:
+
+- **`free` (OmniRoute)** → Claude picks an `auto/*` **route** (`auto/coding`, `auto/cheap`,
+  `auto/fast`, ...) and lets OmniRoute's router pick the concrete model, so it fails over
+  across your provider keys. Prefer routes over pinning one model here.
+- **`nvidia` / paid backends** → Claude picks a concrete **model id** (there's no router in
+  front), restricted to tool-calling-capable models since the worker edits via function
+  calls.
+
+You can always force a specific backend/model/route by naming it: `delegate free --model
+auto/cheap "..."` or `delegate nvidia --model nvidia/nemotron-3-super-120b-a12b "..."`.
 
 ### From inside Claude Code: `/delegate`
 
