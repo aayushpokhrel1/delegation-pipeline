@@ -222,6 +222,27 @@ Everything the worker needs is one `delegate.py` file and the stdlib, so it runs
 device with Python 3.8+. Sync = clone this repo + run the installer. Real keys live in
 `~/.claude/delegate.config.json` (git-ignored), never in the repo.
 
+## Related: save Claude tokens on graphify too
+
+Same spirit, different mechanism. The [`graphify`](https://github.com/aayushpokhrel1) skill
+builds knowledge graphs; its **semantic** extraction (docs, papers, images) otherwise
+dispatches Claude subagents, which spends your Claude tokens on the initial build. Set a
+Gemini key once and graphify routes that work to Gemini instead:
+
+```powershell
+[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<your-key>", "User")
+[Environment]::SetEnvironmentVariable("GOOGLE_API_KEY", "<your-key>", "User")
+```
+
+```bash
+export GEMINI_API_KEY="<your-key>"    # or GOOGLE_API_KEY; graphify accepts either
+```
+
+Code-only corpuses skip semantic extraction entirely and never cost subagent tokens.
+Already-running Claude Code sessions must be fully restarted to pick up a newly set key.
+Details live in the graphify skill's `SKILL.md` ("Save Claude tokens: set a Gemini key").
+Get a key at https://aistudio.google.com/apikey.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
