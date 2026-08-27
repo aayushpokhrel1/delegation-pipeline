@@ -221,3 +221,7 @@ working directory.
 Everything the worker needs is one `delegate.py` file and the stdlib, so it runs on any
 device with Python 3.8+. Sync = clone this repo + run the installer. Real keys live in
 `~/.claude/delegate.config.json` (git-ignored), never in the repo.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
