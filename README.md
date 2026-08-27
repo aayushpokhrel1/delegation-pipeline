@@ -243,6 +243,28 @@ Already-running Claude Code sessions must be fully restarted to pick up a newly 
 Details live in the graphify skill's `SKILL.md` ("Save Claude tokens: set a Gemini key").
 Get a key at https://aistudio.google.com/apikey.
 
+### This repo is graphify-integrated
+
+This repo ships a graphify knowledge-graph integration so Claude consults the graph
+before falling back to raw search, and keeps it current automatically:
+
+- **`CLAUDE.md`** — guidance telling Claude to run `graphify query`/`path`/`explain`
+  before answering codebase questions, and `graphify update .` after code changes.
+- **`.claude/settings.json`** — `PreToolUse` hook-guard that nudges toward the graph
+  on search/read tools.
+- **`.gitattributes`** — a merge driver for the generated `graph.json`.
+- The generated graph itself lives in `graphify-out/` (git-ignored, rebuilt locally).
+
+After cloning, run this once to install the local **git hooks** (post-commit and
+post-checkout rebuild the graph; hooks live in `.git/` and are never version-controlled):
+
+```bash
+graphify hook install
+```
+
+Note: the paths in `.claude/settings.json` point at the author's `graphify` binary; adjust
+them to your own install location if the hook-guard errors on another machine.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
