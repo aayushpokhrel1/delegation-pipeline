@@ -398,10 +398,15 @@ def _parse_response(raw):
     return {"choices": [{"message": message}]}
 
 
+# Some upstreams (behind Cloudflare) block the default urllib signature with a
+# 1010 "browser_signature_banned" error. Send an explicit, honest User-Agent.
+USER_AGENT = "delegate/1.0 (+https://github.com/aayushpokhrel1/delegation-pipeline)"
+
+
 def list_models(backend, timeout):
     """Print the model ids the backend exposes (GET /models)."""
     url = backend["base_url"].rstrip("/") + "/models"
-    headers = {}
+    headers = {"User-Agent": USER_AGENT}
     if backend.get("api_key"):
         headers["Authorization"] = f"Bearer {backend['api_key']}"
     req = urllib.request.Request(url, headers=headers, method="GET")
@@ -432,7 +437,7 @@ def chat_completion(backend, messages, timeout):
         "max_tokens": backend.get("max_tokens", DEFAULT_CONFIG["max_tokens"]),
     }
     data = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
     if backend.get("api_key"):
         headers["Authorization"] = f"Bearer {backend['api_key']}"
 
@@ -446,7 +451,10 @@ def chat_completion(backend, messages, timeout):
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
             last_err = f"HTTP {e.code}: {detail}"
-            if e.code in (429, 500, 502, 503, 504):
+            # 401/403 often come from one bad provider in a load-balanced free
+            # pool (missing key or a Cloudflare ban). Retrying re-rolls to a
+            # different provider, so treat them as transient too.
+            if e.code in (401, 403, 429, 500, 502, 503, 504):
                 time.sleep(1.5 * (attempt + 1))
                 continue
             break
