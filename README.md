@@ -19,6 +19,8 @@ orchestrator) review the resulting `git diff` and commit.
 ~/.claude/bin/delegate <backend> "<task>"
 ```
 
+![demo](assets/demo.gif)
+
 ## Backends
 
 | Backend    | Provider              | Cost         | Notes                                    |
@@ -138,6 +140,12 @@ Add them in the OmniRoute dashboard (open `http://localhost:20128` → provider/
 keys are encrypted at rest), or via CLI (`omniroute keys`). Groq + Cerebras + Gemini alone
 make `free` solidly usable for grunt work. When free is dry, `deepseek` remains the
 reliable paid-but-cheap fallback.
+
+The worker also sends a normal `User-Agent` (some Cloudflare-fronted free providers
+return `1010 browser_signature_banned` to the default `Python-urllib` signature) and
+retries transient provider errors (401/403/429/5xx). Because the free pool is
+load-balanced, a retry re-rolls to a different provider, so one bad route no longer fails
+the whole run.
 
 ## Use it
 
