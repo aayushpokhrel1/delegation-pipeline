@@ -1,5 +1,12 @@
 # Delegation Pipeline
 
+[![GitHub stars](https://img.shields.io/github/stars/aayushpokhrel1/delegation-pipeline?style=flat&logo=github)](https://github.com/aayushpokhrel1/delegation-pipeline/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-6E56CF.svg)](#install-as-a-claude-code-plugin)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/aayushpokhrel1/delegation-pipeline/pulls)
+
 Offload token-heavy grunt work from your paid Claude Code session to **free or cheap
 models**, so your Claude usage goes to the thinking, not the typing.
 
@@ -38,6 +45,19 @@ bash install.sh
 
 This writes a `delegate` launcher into `~/.claude/bin/` (pointing at your checkout) and
 seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the repo.
+
+### Install as a Claude Code plugin
+
+Prefer plugins? Add this repo as a marketplace and install, straight from Claude Code:
+
+```
+/plugin marketplace add aayushpokhrel1/delegation-pipeline
+/plugin install delegation-pipeline
+```
+
+That gives you the `/delegate` command and the `delegate` skill. The worker binary itself
+still comes from the installer above (`bash install.sh` / `./install.ps1`), which writes
+`~/.claude/bin/delegate` and seeds the config. Run it once after installing the plugin.
 
 ### Keys
 

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "delegation-pipeline",
+  "description": "Delegate grunt work from Claude to free/cheap models, so your Claude usage goes to the thinking, not the typing.",
+  "owner": {
+    "name": "Aayush Pokhrel",
+    "url": "https://github.com/aayushpokhrel1"
+  },
+  "plugins": [
+    {
+      "name": "delegation-pipeline",
+      "description": "The /delegate command and delegate skill: hand mechanical work to a free/cheap OpenAI-compatible worker, then review its diff.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "delegation-pipeline",
+  "description": "Offload token-heavy grunt work from your paid Claude session to free/cheap models. Spend Claude tokens on thinking, not typing.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Aayush Pokhrel",
+    "url": "https://github.com/aayushpokhrel1"
+  },
+  "homepage": "https://github.com/aayushpokhrel1/delegation-pipeline",
+  "license": "MIT"
+}
