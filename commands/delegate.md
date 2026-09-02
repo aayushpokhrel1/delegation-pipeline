@@ -40,7 +40,12 @@ Follow this protocol:
    ```
    ~/.claude/bin/delegate <backend> [--model <id>] "<your expanded self-contained instruction>"
    ```
-   Its step logs go to stderr and its summary to stdout.
+   Its step logs go to stderr and its summary to stdout. A `free` worker can run for
+   minutes (the free model is the slow part), so give the run a long foreground timeout
+   (up to ~600000ms / 10min on the Bash tool) so it completes in the foreground and you get
+   the summary directly. If it still gets detached to the background at a shorter default,
+   the worker keeps running and its writes land normally, but confirm the run actually
+   finished before reviewing, or you may read a half-applied tree.
 4. **Review.** Run `git diff` and actually read the changes. The worker cannot run shell,
    tests, or git, so verify correctness yourself. Fix small issues inline with Edit;
    re-delegate with a sharper spec if it drifted badly.

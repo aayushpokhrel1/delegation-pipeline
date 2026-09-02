@@ -196,6 +196,13 @@ The command has Claude expand your request into a tight, self-contained spec, ru
 worker, then review the resulting `git diff` and report back. First token is the backend
 (`free` if omitted); the rest is the task.
 
+A `free` worker can take minutes, since the free model is the slow part. Run it with a long
+foreground timeout so it isn't detached to the background mid-run. If your shell or tool
+does background it at a default timeout, that only cuts off the *wait*: the worker keeps
+running and its file writes still land. Just confirm the run finished before treating the
+diff as complete, reading files while a backgrounded worker is still going can show a
+half-applied tree. `deepseek`/`nvidia` are faster if you want to avoid the wait entirely.
+
 ## How Claude should drive it
 
 The orchestrator protocol lives in your global `~/.claude/CLAUDE.md`. In short:
