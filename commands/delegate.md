@@ -1,5 +1,5 @@
 ---
-description: Hand a mechanical task to a free/cheap model worker, then review its diff
+description: Hand a task to a free/cheap worker (route by complexity: free for mechanical, deepseek for substantial), then review its diff
 argument-hint: [free|nvidia|deepseek|kimi] <task description>
 allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
@@ -14,10 +14,13 @@ If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `d
 `kimi`), use it and treat the rest as the **task**. Otherwise treat the whole thing as the
 task and **you choose the backend and model yourself** based on the task.
 
-**You are the router.** Size up the task and pick:
-- **Backend:** `free` (OmniRoute, $0) when its pool is healthy; `nvidia` (free trial
-  credits, strong tool-calling models) when free is dry; `deepseek` for
-  reliability-sensitive or trickier work; `kimi` only if the user asked.
+**You are the router. Pick by task COMPLEXITY** (the gate is a tight, verifiable spec, not
+low difficulty):
+- **Backend:** `free` (OmniRoute, $0) for trivial / mechanical work when its pool is healthy;
+  `deepseek` (cheap, roughly Sonnet-class) for SUBSTANTIAL well-specified work, a whole
+  module, a real multi-file refactor, a non-trivial first draft (do not cap delegation at
+  boilerplate); `nvidia` (free trial credits, strong tool-calling models) when free is dry;
+  `kimi` only if the user asked.
 - **Model (mainly for `nvidia`):** pass `--model <id>` matched to the task. Read
   `MODELS.md` in this repo for the task->model shortlist, and run
   `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick

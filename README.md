@@ -214,13 +214,16 @@ The orchestrator protocol lives in your global `~/.claude/CLAUDE.md`. In short:
    drifted. Workers never commit.
 4. You run tests and commit, after review.
 
-Delegate bulk mechanical work (boilerplate, repetitive edits, docstrings, first drafts).
-Keep design, tricky debugging, and security-sensitive code in the Claude session.
+Route by complexity, the gate is a tight verifiable spec, not low difficulty: `free` for
+trivial/mechanical work (boilerplate, repetitive edits, docstrings, stubs); `deepseek`
+(roughly Sonnet-class) for substantial well-specified work (a whole module, a real refactor,
+a non-trivial first draft), do not cap delegation at boilerplate. Keep design, tricky
+debugging, security-sensitive code, deep-context work, and one-liners in the Claude session.
 
 ### Proactive delegation (no `/delegate` needed)
 
 The orchestrator (Opus) is set up to delegate **on its own** whenever a request contains
-qualifying grunt work, without you typing `/delegate`. It announces the backend/model in
+work it can spec and verify, mechanical or substantial, without you typing `/delegate`. It announces the backend/model in
 one line, runs the worker, reviews the diff, and folds the result in. `/delegate` and
 saying "delegate this" still work as manual triggers; they're just not required. Say
 **"don't delegate this"** to keep a task (or a sensitive repo) in-session.
@@ -235,12 +238,14 @@ this to that device's `~/.claude/CLAUDE.md`:
 
 ```markdown
 # Delegation to cheap-model workers
-Use `~/.claude/bin/delegate <backend> [--model <id>] "<task>"` to offload grunt work.
+Use `~/.claude/bin/delegate <backend> [--model <id>] "<task>"` to offload work.
 Delegate proactively (no /delegate needed): announce the backend/model in one line, run
-the worker, then review the git diff. You route: prefer `free`, use `nvidia` when free is
-dry (tool-calling models only, see MODELS.md), `deepseek` for reliability-sensitive work.
-Keep design, tricky debugging, security-sensitive code, and one-liners in-session. Stop if
-told "don't delegate this".
+the worker, then review the git diff. Route by COMPLEXITY (the gate is a tight verifiable
+spec, not low difficulty): `free` for trivial/mechanical work; `deepseek` (roughly
+Sonnet-class) for substantial well-specified work like a whole module or a real refactor,
+do not cap it at boilerplate; `nvidia` when free is dry (tool-calling models only, see
+MODELS.md). Keep design, tricky debugging, security-sensitive code, deep-context work, and
+one-liners in-session. Stop if told "don't delegate this".
 ```
 
 (The full version is in this repo's git history / the author's own CLAUDE.md.)
