@@ -70,7 +70,18 @@ DEFAULT_CONFIG = {
         "nvidia": {
             "base_url": "https://integrate.api.nvidia.com/v1",
             "api_key_env": "NVIDIA_API_KEY",
-            "model": "deepseek-ai/deepseek-v4-flash-0731",
+            "model": "nvidia/nemotron-3-super-120b-a12b",
+        },
+        "openrouter": {
+            "base_url": "https://openrouter.ai/api/v1",
+            "api_key_env": "OPENROUTER_API_KEY",
+            "api_key": "",
+            "model": "nvidia/nemotron-3.5-lightning:free",
+            # Optional leaderboard attribution; OpenRouter reads these if present.
+            "extra_headers": {
+                "HTTP-Referer": "https://github.com/aayushpokhrel1/delegation-pipeline",
+                "X-Title": "delegation-pipeline",
+            },
         },
     },
     "max_steps": 40,
@@ -428,13 +439,21 @@ def _parse_response(raw):
 USER_AGENT = "delegate/1.0 (+https://github.com/aayushpokhrel1/delegation-pipeline)"
 
 
-def list_models(backend, timeout):
-    """Print the model ids the backend exposes (GET /models)."""
-    url = backend["base_url"].rstrip("/") + "/models"
+def _base_headers(backend):
+    """Auth + User-Agent + any per-backend extra_headers (e.g. OpenRouter attribution)."""
     headers = {"User-Agent": USER_AGENT}
     if backend.get("api_key"):
         headers["Authorization"] = f"Bearer {backend['api_key']}"
-    req = urllib.request.Request(url, headers=headers, method="GET")
+    extra = backend.get("extra_headers")
+    if isinstance(extra, dict):
+        headers.update({str(k): str(v) for k, v in extra.items()})
+    return headers
+
+
+def list_models(backend, timeout):
+    """Print the model ids the backend exposes (GET /models)."""
+    url = backend["base_url"].rstrip("/") + "/models"
+    req = urllib.request.Request(url, headers=_base_headers(backend), method="GET")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -462,9 +481,8 @@ def chat_completion(backend, messages, timeout):
         "max_tokens": backend.get("max_tokens", DEFAULT_CONFIG["max_tokens"]),
     }
     data = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
-    if backend.get("api_key"):
-        headers["Authorization"] = f"Bearer {backend['api_key']}"
+    headers = _base_headers(backend)
+    headers["Content-Type"] = "application/json"
 
     last_err = None
     for attempt in range(3):

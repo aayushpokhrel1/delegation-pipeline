@@ -54,12 +54,40 @@ default is now `nvidia/nemotron-3-super-120b-a12b`. Do NOT rely on the older `me
 or have EOL'd. The catalog churns fast, so **always `--list-models` first** and confirm any
 new pick with a one-file smoke test before a big run.
 
+## OpenRouter backend: task -> model
+
+OpenAI-compatible at `https://openrouter.ai/api/v1`, auth `Bearer $OPENROUTER_API_KEY`.
+Same rule as NVIDIA: **the worker drives tools, so pick tool-capable models only**, and the
+catalog churns, so **`delegate openrouter --list-models` first**.
+
+Free models carry a **`:free` suffix** (`$0` prompt + completion). As of the 2026-09-17
+survey, OpenRouter listed 444 models: 24 free, 14 of those also vision (image input).
+
+| Task shape                                   | Model (`--model ...`)                | Notes                                    |
+|----------------------------------------------|--------------------------------------|------------------------------------------|
+| **Default / fast free** (backend default)    | `nvidia/nemotron-3.5-lightning:free` | tool-capable, fast; picked from the survey (confirm with a local smoke test once your key is set) |
+| **Free, tool-capable alternates**            | `inclusionai/ling-3.0-flash-*:free`, `poolside/laguna-xs-2.1:free` |                                          |
+| **Free, tiny/fastest**                       | `liquid/lfm-2.5-2.6b:free`           | smallest; for trivial bulk edits         |
+| **Free vision** (image input)                | `google/gemma-4-31b-it:free`, `inclusionai/ling-3.0-flash-vl:free`, `thinkingmachines/inkling:free` | the worker is text-only today; useful if you extend it |
+
+**Free-tier rate limits:** ~50 requests/day at a `$0` balance, ~1000/day with ~$10 of
+credits on the account. Some free models also require enabling prompt-logging/training in
+your OpenRouter **privacy settings** or they reject the request with a data-policy error, so
+if a `:free` id 4xxs on a policy message, either flip that setting or pick another id.
+
+Note the overlap: OmniRoute (`free`) already routes *through* OpenRouter among its providers.
+A direct `openrouter` backend is worth it when you want **explicit model pinning** (a specific
+fast or vision model) instead of OmniRoute's auto-routing, or a model not enabled on the
+NVIDIA account.
+
 ## Which backend first
 
 1. `free` (OmniRoute) when its pool is healthy: $0, no credits burned.
 2. `nvidia` when free is dry: free trial credits, strong tool-calling models.
-3. `deepseek` for reliability-sensitive or trickier work: cheap and dependable.
-4. `kimi` only when explicitly asked: premium.
+3. `openrouter` when you want a **pinned** free/vision model, or NVIDIA is dry and
+   OmniRoute's pool is exhausted: free `:free` models (rate-limited) or cheap paid ones.
+4. `deepseek` for reliability-sensitive or trickier work: cheap and dependable.
+5. `kimi` only when explicitly asked: premium.
 
 ## How Opus should decide
 

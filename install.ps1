@@ -53,7 +53,9 @@ Write-Host ""
 Write-Host "Done. Test it:"
 Write-Host "  & `"$Cmd`" free `"list the files here and summarize the project`""
 Write-Host ""
-Write-Host "For deepseek/kimi, set keys (env vars or edit $Config):"
+Write-Host "For deepseek/kimi/nvidia/openrouter, set keys (env vars or edit $Config):"
 Write-Host '  setx DEEPSEEK_API_KEY sk-...'
 Write-Host '  setx MOONSHOT_API_KEY sk-...'
+Write-Host '  setx NVIDIA_API_KEY nvapi-...'
+Write-Host '  setx OPENROUTER_API_KEY sk-or-...   # https://openrouter.ai/keys'
 Write-Host "For the free backend, run OmniRoute in another terminal:  npx omniroute"

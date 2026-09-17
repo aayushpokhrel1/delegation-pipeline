@@ -64,12 +64,13 @@ honest caveats live in [`bench/README.md`](bench/README.md).
 
 | Backend    | Provider              | Cost         | Notes                                    |
 |------------|-----------------------|--------------|------------------------------------------|
-| `free`     | OmniRoute (local)     | $0           | Local gateway, `auto/coding` model       |
-| `nvidia`   | NVIDIA API Catalog    | free credits | build.nvidia.com; strong models, free tier |
-| `deepseek` | DeepSeek API          | cheap        | Reliable; good default for real work     |
-| `kimi`     | Kimi / Moonshot API   | premium      | Strongest; use when quality matters      |
+| `free`       | OmniRoute (local)     | $0           | Local gateway, `auto/coding` model       |
+| `nvidia`     | NVIDIA API Catalog    | free credits | build.nvidia.com; strong models, free tier |
+| `openrouter` | OpenRouter API        | free / cheap | Pin a specific `:free` or vision model; `:free` ids are rate-limited |
+| `deepseek`   | DeepSeek API          | cheap        | Reliable; good default for real work     |
+| `kimi`       | Kimi / Moonshot API   | premium      | Strongest; use when quality matters      |
 
-All three are just an OpenAI-compatible base URL + model + key, configured in
+All of them are just an OpenAI-compatible base URL + model + key, configured in
 `~/.claude/delegate.config.json`.
 
 ## Install
@@ -128,6 +129,16 @@ still comes from the installer above (`bash install.sh` / `./install.ps1`), whic
   You can also plug NVIDIA into OmniRoute itself (so the `free`/`auto` router can use it):
   open `http://localhost:20128` → provider keys → add the NVIDIA key. Either way works;
   the direct `nvidia` backend is the more predictable of the two.
+- **openrouter**: get a key at https://openrouter.ai/keys, then:
+  ```bash
+  export OPENROUTER_API_KEY=sk-or-...
+  ```
+  OpenAI-compatible via `https://openrouter.ai/api/v1`. Defaults to
+  `nvidia/nemotron-3.5-lightning:free`; free models carry a `:free` suffix and are rate-limited
+  (~50 requests/day at $0, ~1000/day with ~$10 of credits). The worker needs tool calling and
+  the catalog churns, so `--list-models` first and see [`MODELS.md`](MODELS.md). OmniRoute's
+  `free` backend already routes *through* OpenRouter, so reach for this direct backend when you
+  want to **pin** a specific fast/free or vision model instead of auto-routing.
 
 ### Autostart
 

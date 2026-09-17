@@ -19,6 +19,16 @@
       "base_url": "https://integrate.api.nvidia.com/v1",
       "api_key_env": "NVIDIA_API_KEY",
       "model": "nvidia/nemotron-3-super-120b-a12b"
+    },
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "api_key": "",
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "extra_headers": {
+        "HTTP-Referer": "https://github.com/aayushpokhrel1/delegation-pipeline",
+        "X-Title": "delegation-pipeline"
+      }
     }
   },
   "max_steps": 40,

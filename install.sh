@@ -49,7 +49,9 @@ echo
 echo "Done. Test it:"
 echo "  ~/.claude/bin/delegate free \"list the files here and summarize the project\""
 echo
-echo "For deepseek/kimi, set your keys (env vars or edit $CONFIG):"
+echo "For deepseek/kimi/nvidia/openrouter, set your keys (env vars or edit $CONFIG):"
 echo "  export DEEPSEEK_API_KEY=sk-..."
 echo "  export MOONSHOT_API_KEY=sk-..."
+echo "  export NVIDIA_API_KEY=nvapi-..."
+echo "  export OPENROUTER_API_KEY=sk-or-...   # https://openrouter.ai/keys"
 echo "For the free backend, run OmniRoute in another terminal:  npx omniroute"
