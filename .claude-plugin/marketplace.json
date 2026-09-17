@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "delegation-pipeline",
-      "description": "The /delegate command and delegate skill: hand mechanical work to a free/cheap OpenAI-compatible worker, then review its diff.",
+      "description": "The /delegate and /orchestrate commands and skills: route work by complexity to free/cheap OpenAI-compatible workers (free / openrouter / nvidia / deepseek), verify and commit, then review the diff. Needs the worker binary from install.sh.",
       "source": "./",
       "category": "productivity"
     }

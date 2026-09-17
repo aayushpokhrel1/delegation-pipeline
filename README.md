@@ -86,20 +86,27 @@ bash install.sh
 ```
 
 This writes a `delegate` launcher into `~/.claude/bin/` (pointing at your checkout) and
-seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the repo.
+seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the repo. It no
+longer copies the slash commands, those ship with the plugin (next), so they are not
+duplicated.
 
-### Install as a Claude Code plugin
+### Install the plugin (commands + skills)
 
-Prefer plugins? Add this repo as a marketplace and install, straight from Claude Code:
+The `/delegate` + `/orchestrate` commands and the `delegate` / `orchestrate` skills ship as a
+Claude Code plugin, which makes them available in **every** project (and the skills
+model-invokable, so "orchestrate it" works anywhere):
 
 ```
-/plugin marketplace add aayushpokhrel1/delegation-pipeline
-/plugin install delegation-pipeline
+claude plugin marketplace add aayushpokhrel1/delegation-pipeline
+claude plugin install delegation-pipeline
 ```
 
-That gives you the `/delegate` command and the `delegate` skill. The worker binary itself
-still comes from the installer above (`bash install.sh` / `./install.ps1`), which writes
-`~/.claude/bin/delegate` and seeds the config. Run it once after installing the plugin.
+(Or the interactive `/plugin marketplace add ...` and `/plugin install ...`.) After a repo
+change, `claude plugin update delegation-pipeline` pulls it.
+
+**Two pieces, by design:** the plugin carries the Claude-facing commands + skills; `install.sh`
+/ `install.ps1` carry the machine-side worker binary (`~/.claude/bin/delegate`) and config,
+which a plugin cannot ship. Run both once on a new device.
 
 ### Keys
 

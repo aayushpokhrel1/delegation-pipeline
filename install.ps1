@@ -42,12 +42,13 @@ if (-not (Test-Path $Config)) {
     Write-Host "config exists      -> $Config (left unchanged)"
 }
 
-New-Item -ItemType Directory -Force -Path $CmdDir | Out-Null
-Get-ChildItem (Join-Path $RepoDir "commands") -Filter *.md | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $CmdDir $_.Name) -Force
-    Write-Host "installed command  -> $CmdDir\$($_.Name)"
-}
-Write-Host "  (use /delegate and /orchestrate in Claude Code)"
+# Slash commands and skills ship with the plugin, not this installer, so they are not
+# copied here (that would duplicate the plugin's commands). Install the plugin for
+# /delegate + /orchestrate and the delegate/orchestrate skills:
+Write-Host ""
+Write-Host "For the /delegate + /orchestrate commands and skills, install the plugin:"
+Write-Host "  claude plugin marketplace add aayushpokhrel1/delegation-pipeline"
+Write-Host "  claude plugin install delegation-pipeline"
 
 Write-Host ""
 Write-Host "Done. Test it:"

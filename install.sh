@@ -38,12 +38,13 @@ else
   echo "config exists   -> $CONFIG (left unchanged)"
 fi
 
-mkdir -p "$CMD_DIR"
-for f in "$REPO_DIR"/commands/*.md; do
-  cp "$f" "$CMD_DIR/"
-  echo "installed command -> $CMD_DIR/$(basename "$f")"
-done
-echo "  (use /delegate and /orchestrate in Claude Code)"
+# Slash commands and skills ship with the plugin, not this installer, so they are not
+# copied here (that would duplicate the plugin's commands). Install the plugin for
+# /delegate + /orchestrate and the delegate/orchestrate skills:
+echo
+echo "For the /delegate + /orchestrate commands and skills, install the plugin:"
+echo "  claude plugin marketplace add aayushpokhrel1/delegation-pipeline"
+echo "  claude plugin install delegation-pipeline"
 
 echo
 echo "Done. Test it:"

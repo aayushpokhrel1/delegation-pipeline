@@ -38,11 +38,17 @@ can't be specified in isolation, one-liners (the spec would cost more tokens tha
 ~/.claude/bin/delegate <backend> [--model <id>] "<task>"
 ```
 
-Backends: `free` (OmniRoute, $0), `nvidia` (free trial credits, strong tool-calling models),
-`deepseek` (cheap, ~Sonnet-class), `kimi` (premium, only if asked). You are the router: pick
-by task COMPLEXITY, `free` for trivial/mechanical, `deepseek` for substantial well-specified
-work; `nvidia` when free is dry (tool-calling models only, run `--list-models` and see
-`MODELS.md`).
+Backends: `free` (OmniRoute, $0), `openrouter` (free `:free` models, rate-limited, or cheap
+paid), `nvidia` (free trial credits, strong tool-calling models), `deepseek` (cheap,
+~Sonnet-class), `kimi` (premium, only if asked). You are the router: pick by task COMPLEXITY,
+`free` for trivial/mechanical, `deepseek` for substantial well-specified work; `openrouter`
+to pin a specific free `:free` or vision model (preferred over `nvidia` so nvidia's finite
+credits stay in reserve) or when free is dry; `nvidia` for a stronger free model than a
+`:free` id. Tool-calling models only; run `--list-models` and see `MODELS.md`.
+
+For an image task (a mockup, screenshot, diagram), pass `--image <path|url>` with a
+vision-capable model (e.g. `openrouter --model inclusionai/ling-3.0-flash-vl:free`); the
+worker can also fetch images itself mid-task via its `view_image` tool.
 
 ## Protocol per delegated task
 
