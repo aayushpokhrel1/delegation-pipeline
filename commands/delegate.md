@@ -1,6 +1,6 @@
 ---
 description: Hand a task to a free/cheap worker (route by complexity: free for mechanical, deepseek for substantial), then review its diff
-argument-hint: [free|nvidia|deepseek|kimi] <task description>
+argument-hint: [free|nvidia|openrouter|deepseek|kimi] <task description>
 allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
 
@@ -10,9 +10,9 @@ usage as possible on the grunt work itself.
 
 Arguments: `$ARGUMENTS`
 
-If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `deepseek`,
-`kimi`), use it and treat the rest as the **task**. Otherwise treat the whole thing as the
-task and **you choose the backend and model yourself** based on the task.
+If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `openrouter`,
+`deepseek`, `kimi`), use it and treat the rest as the **task**. Otherwise treat the whole
+thing as the task and **you choose the backend and model yourself** based on the task.
 
 **You are the router. Pick by task COMPLEXITY** (the gate is a tight, verifiable spec, not
 low difficulty):
@@ -20,14 +20,21 @@ low difficulty):
   `deepseek` (cheap, roughly Sonnet-class) for SUBSTANTIAL well-specified work, a whole
   module, a real multi-file refactor, a non-trivial first draft (do not cap delegation at
   boilerplate); `nvidia` (free trial credits, strong tool-calling models) when free is dry;
-  `kimi` only if the user asked.
-- **Model (mainly for `nvidia`):** pass `--model <id>` matched to the task. Read
-  `MODELS.md` in this repo for the task->model shortlist, and run
+  `openrouter` when you want to **pin** a specific fast `:free` or vision model, or NVIDIA is
+  dry and OmniRoute's free pool is exhausted (`:free` models are rate-limited, ~50 req/day at
+  $0); `kimi` only if the user asked.
+- **Model (mainly for `nvidia` / `openrouter`):** pass `--model <id>` matched to the task.
+  Read `MODELS.md` in this repo for the task->model shortlist, and run
   `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick
   tool-calling-capable models (the worker edits via function calls); when unsure, use the
-  backend default. Verified `nvidia` picks: `deepseek-ai/deepseek-v4-flash-0731` (default,
-  fast/cheap), `nvidia/nemotron-3-super-120b-a12b` (quality), `nvidia/nemotron-3-nano-30b-a3b`
-  (small). The catalog changes, so `--list-models` if a pick 404s or 410s.
+  backend default. Current `nvidia` default: `nvidia/nemotron-3-super-120b-a12b` (verified
+  tool-calling); avoid `deepseek-ai/deepseek-v4-flash-0731` (hangs on this account).
+  OpenRouter free ids carry a `:free` suffix. The catalog changes, so `--list-models` if a
+  pick 404s or 410s.
+- **Images / vision:** if the task involves an image (a mockup, screenshot, diagram), pass
+  `--image <path|url>` (repeatable) and a **vision-capable** model, e.g.
+  `openrouter --model inclusionai/ling-3.0-flash-vl:free --image mockup.png`. The worker can
+  also fetch images itself mid-task via its `view_image` tool.
 
 State which backend and model you chose and why in one line before running.
 

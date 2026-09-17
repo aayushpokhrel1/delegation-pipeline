@@ -14,7 +14,9 @@ itself.
 - **Orchestrator** = Claude Opus in this session. The only component that spends Claude
   tokens. Holds the plan, writes each brief, routes each task, adjudicates reviews.
 - **Tier B** = the delegation pipeline (`~/.claude/bin/delegate`, `free` / `deepseek` /
-  `nvidia`). Zero Claude tokens. **Default tier for both implementation and review.**
+  `nvidia` / `openrouter`). Zero Claude tokens. **Default tier for both implementation and
+  review.** `free` (OmniRoute) is the only $0-unlimited local tier; `nvidia` / `deepseek` /
+  `openrouter` are remote (credits, or free-with-daily-limits).
 - **Tier A** = Claude subagents (Agent tool: `haiku` / `sonnet` / `opus`). Costs Claude
   tokens. Escape hatch only.
 
@@ -22,16 +24,42 @@ itself.
 
 Any single axis landing in the escalate column sends that task to Tier A; otherwise Tier B.
 
-- **Complexity:** mechanical / boilerplate -> `delegate free`; substantial but specifiable
-  (a whole module, a real refactor) -> `delegate deepseek`; needs broad codebase judgment ->
+- **Complexity:** mechanical / boilerplate, or substantial-but-specifiable (a whole module,
+  a real refactor) -> Tier B (pick the backend below); needs broad codebase judgment ->
   Tier A `sonnet` / `opus`.
 - **Iteration depth:** verifiable in ~one shot -> Tier B; long autonomous run-fail-edit loop,
   or needs a live service / Docker / the app running -> Tier A subagent.
 - **Sensitivity:** ordinary code -> Tier B; security-sensitive or full-context debugging ->
   Tier A or the orchestrator itself.
 
-Reviews default to Tier B (`deepseek`). Pick backend/model from the live catalog
-(`delegate <backend> --list-models`); the delegation-pipeline repo's `MODELS.md` has the
+### Tier B backend: cheapest-that-fits
+
+Once a task is Tier B, pick the **cheapest backend whose capability fits**, then escalate the
+*backend* (not the tier) if it fails. Each has a distinct job:
+
+- **`free` (OmniRoute, $0 local, unlimited):** default for **mechanical / boilerplate / bulk**
+  when its pool is healthy. Slow; the pool can be dry or flaky. `--model auto/coding`, or
+  `auto/cheap` for high volume.
+- **`openrouter` ($0 `:free`, rate-limited):** two jobs. (1) **free-remote fallback** when
+  OmniRoute is dry, preferred over `nvidia` so nvidia's finite credits stay in reserve.
+  (2) the **pin lever**: a specific fast/quality free model, one not on the nvidia account, or
+  a **vision** model (`--model ...-vl:free --image <path|url>`). `:free` ids are rate-limited
+  (~50/day at $0, ~1000/day with ~$10 credit) and slow (~3 min/trivial), so not for high
+  volume or when you are blocking on the result.
+- **`nvidia` (free trial credits, finite):** a **stronger free model** than a `:free` id gives,
+  when openrouter's free models are too weak but you still want it free. Second to openrouter
+  for ordinary free work because the credits are exhaustible. `--list-models` first, the
+  catalog churns.
+- **`deepseek` (cheap, fast, reliable, ~Sonnet-class):** default for **substantial
+  well-specified work** (a whole module, a real refactor, a non-trivial first draft) and for
+  **reviews**. Go straight here, do not burn time on weak/slow free models, when the logic is
+  real or the result must be dependable.
+- **`kimi` (premium):** only when the user explicitly asks.
+
+One line: mechanical -> `free` -> (dry) `openrouter:free` -> `nvidia`; substantial or
+reliability-critical -> `deepseek`; need a pinned or vision model -> `openrouter --model`
+(`--image` for vision); reviews -> `deepseek`. Confirm any pick with
+`delegate <backend> --list-models`; the delegation-pipeline repo's `MODELS.md` has the
 current shortlist.
 
 **Cost gate (your call).** Delegation spends *your* tokens on the brief, the review, and any
@@ -45,7 +73,7 @@ saves tokens when the work is bulkier than its description, so one-liners stay i
    values. Save to `brief.md` so review can cite it. The worker has no conversation context.
 2. **Route and run** with verify + commit, so you get back a tested, committed result:
    ```
-   ~/.claude/bin/delegate <free|deepseek> --verify "<test/typecheck cmd>" --commit "<msg>, per brief" "<brief>"
+   ~/.claude/bin/delegate <free|openrouter|nvidia|deepseek> --verify "<test/typecheck cmd>" --commit "<msg>, per brief" "<brief>"
    ```
    `--verify` runs after editing; a non-zero exit prints output and exits 2 without
    committing. `--commit` fires only on green. On Windows `--verify` runs through `cmd.exe`,

@@ -14,7 +14,9 @@ Work to orchestrate: `$ARGUMENTS`
 
 - **You (orchestrator)** = Claude Opus. The only component that spends Claude tokens.
 - **Tier B** = the delegation pipeline (`~/.claude/bin/delegate`, backends `free` / `deepseek`
-  / `nvidia`). Zero Claude tokens. **Default tier for both implementation and review.**
+  / `nvidia` / `openrouter`). Zero Claude tokens. **Default tier for both implementation and
+  review.** Only `free` (OmniRoute) is $0-unlimited local; `nvidia` / `deepseek` /
+  `openrouter` are remote (credits, or free-with-daily-limits).
 - **Tier A** = Claude subagents (the Agent tool: `haiku` / `sonnet` / `opus`). Costs Claude
   tokens. Escape hatch only.
 
@@ -22,8 +24,8 @@ Work to orchestrate: `$ARGUMENTS`
 
 Any single axis landing in the "escalate" column sends that task to Tier A. Otherwise Tier B.
 
-- **Complexity:** mechanical / boilerplate -> `delegate free`; substantial but specifiable, a
-  whole module or a real refactor -> `delegate deepseek`; needs broad codebase judgment ->
+- **Complexity:** mechanical / boilerplate, or substantial-but-specifiable (a whole module or
+  a real refactor) -> Tier B (pick the backend below); needs broad codebase judgment ->
   Tier A subagent (`sonnet` / `opus`).
 - **Iteration depth:** verifiable in ~one shot (you run verify once and commit) -> Tier B; a
   long autonomous run-fail-edit loop, or needs a live service / Docker / the app running ->
@@ -31,9 +33,31 @@ Any single axis landing in the "escalate" column sends that task to Tier A. Othe
 - **Sensitivity:** ordinary code -> Tier B; security-sensitive or full-context debugging ->
   Tier A, or handle it yourself.
 
-Reviews default to Tier B (`deepseek`) as well. Pick the backend/model from the live catalog
-(`delegate <backend> --list-models`); the delegation-pipeline repo's `MODELS.md` has the
-current shortlist. State your choice and why in one line before running.
+### Tier B backend: cheapest-that-fits
+
+Once a task is Tier B, pick the **cheapest backend whose capability fits**, then escalate the
+*backend* (not the tier) if it fails. State the choice and why in one line before running.
+
+- **`free` (OmniRoute, $0 local, unlimited):** default for **mechanical / boilerplate / bulk**
+  when its pool is healthy (`--model auto/coding`, or `auto/cheap` for high volume). Slow;
+  pool can be dry.
+- **`openrouter` ($0 `:free`, rate-limited):** the **free-remote fallback** when OmniRoute is
+  dry, preferred over `nvidia` so nvidia's finite credits stay in reserve; and the **pin
+  lever** for a specific fast/quality free model, one not on the nvidia account, or a
+  **vision** model (`--model ...-vl:free --image <path|url>`). `:free` is rate-limited
+  (~50/day at $0) and slow, so not for high volume or when you are blocking on the result.
+- **`nvidia` (free trial credits, finite):** a **stronger free model** than a `:free` id when
+  those are too weak; used after openrouter because credits are exhaustible. `--list-models`
+  first.
+- **`deepseek` (cheap, fast, reliable, ~Sonnet-class):** default for **substantial
+  well-specified work** and **reviews**. Go straight here when the logic is real or the result
+  must be dependable, rather than fighting a weak/slow free model.
+- **`kimi` (premium):** only when the user asks.
+
+One line: mechanical -> `free` -> (dry) `openrouter:free` -> `nvidia`; substantial or
+reliability-critical -> `deepseek`; pinned/vision model -> `openrouter --model` (`--image` for
+vision); reviews -> `deepseek`. Confirm any pick with `delegate <backend> --list-models`;
+`MODELS.md` has the current shortlist.
 
 **Cost gate (your call).** Delegation is not free of *your* tokens: the brief, the review,
 and any re-run all cost Claude tokens. Before routing a task to Tier B, weigh that overhead
@@ -50,7 +74,7 @@ description, which is why one-liners and edits smaller than their own spec stay 
    them so the worker's diff stays attributable (offer to stash, do not stash without asking).
 3. **Route and run.** Hand off with verify + commit so you get back a tested, committed result:
    ```bash
-   ~/.claude/bin/delegate <free|deepseek> [--model <id>] \
+   ~/.claude/bin/delegate <free|openrouter|nvidia|deepseek> [--model <id>] \
      --verify "<test or typecheck command>" \
      --commit "<clear message>, per brief" \
      "<the full brief>"
