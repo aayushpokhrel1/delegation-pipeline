@@ -68,7 +68,14 @@ survey, OpenRouter listed 444 models: 24 free, 14 of those also vision (image in
 | **Default / fast free** (backend default)    | `nvidia/nemotron-3.5-lightning:free` | tool-capable, fast; picked from the survey (confirm with a local smoke test once your key is set) |
 | **Free, tool-capable alternates**            | `inclusionai/ling-3.0-flash-*:free`, `poolside/laguna-xs-2.1:free` |                                          |
 | **Free, tiny/fastest**                       | `liquid/lfm-2.5-2.6b:free`           | smallest; for trivial bulk edits         |
-| **Free vision** (image input)                | `google/gemma-4-31b-it:free`, `inclusionai/ling-3.0-flash-vl:free`, `thinkingmachines/inkling:free` | the worker is text-only today; useful if you extend it |
+| **Free vision** (image input)                | `inclusionai/ling-3.0-flash-vl:free`, `google/gemma-4-31b-it:free`, `thinkingmachines/inkling:free` | usable now (see below). `ling-3.0-flash-vl:free` saw a test image and edited in ~6s; `gemma-4-31b-it:free`'s shared free pool 429s often, retry or pin another |
+
+**Vision (image input):** the worker can see images. Attach them at launch with
+`--image <path|url>` (repeatable), or the worker can call the `view_image` tool mid-task with
+a repo-relative path or an http(s) URL. Either needs a **vision-capable model**:
+`delegate openrouter --model inclusionai/ling-3.0-flash-vl:free --image mockup.png "<task>"`.
+Non-vision models ignore the image. Free vision models share a rate-limited pool, so a `:free`
+vision id may 429; retry or pin a different one.
 
 **Free-tier rate limits:** ~50 requests/day at a `$0` balance, ~1000/day with ~$10 of
 credits on the account. Some free models also require enabling prompt-logging/training in

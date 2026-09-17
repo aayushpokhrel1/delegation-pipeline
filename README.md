@@ -207,12 +207,18 @@ the whole run.
 ~/.claude/bin/delegate deepseek "Add type hints to every function in src/parser.py"
 ~/.claude/bin/delegate free --model auto/cheap "Write a docstring for each function in utils/"
 ~/.claude/bin/delegate nvidia "Convert callbacks to async/await in api/client.py"
+
+# vision: attach an image (needs a vision-capable model)
+~/.claude/bin/delegate openrouter --model inclusionai/ling-3.0-flash-vl:free \
+  --image mockup.png "Build the login form in src/Login.jsx to match this mockup"
 ```
 
 Step logs stream to **stderr**; the final **summary** prints to **stdout**.
 
 Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override),
-`--max-steps N`, `--list-models` (print the backend's catalog and exit).
+`--image <path|url>` (attach an image, repeatable, needs a vision model; the worker can also
+fetch images mid-task via its `view_image` tool), `--max-steps N`, `--list-models` (print the
+backend's catalog and exit), plus `--verify` / `--commit` (below).
 
 ### Letting Claude pick the model
 

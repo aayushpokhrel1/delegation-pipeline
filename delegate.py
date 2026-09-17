@@ -26,6 +26,7 @@ Only the Python standard library is used, so this runs anywhere Python 3.8+ exis
 """
 
 import argparse
+import base64
 import fnmatch
 import json
 import os
@@ -99,6 +100,9 @@ IGNORE_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__",
                "dist", "build", ".next", ".mypy_cache", ".pytest_cache"}
 MAX_READ_BYTES = 200_000
 MAX_SEARCH_MATCHES = 200
+MAX_IMAGE_BYTES = 8_000_000
+IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+              ".gif": "image/gif", ".webp": "image/webp"}
 
 
 def load_config():
@@ -355,6 +359,23 @@ TOOLS_SPEC = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "view_image",
+            "description": ("Attach an image so you can see it. Give a repo-relative file path "
+                            "or an http(s) URL. The image appears as the next message. Use when "
+                            "the task refers to a screenshot, mockup, diagram, or other image."),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "src": {"type": "string",
+                            "description": "Repo-relative image path or http(s) URL"},
+                },
+                "required": ["src"],
+            },
+        },
+    },
 ]
 
 TOOL_IMPL = {
@@ -450,6 +471,54 @@ def _base_headers(backend):
     return headers
 
 
+# --------------------------------------------------------------------------- #
+# Vision: caller- or worker-supplied images -> OpenAI multimodal content
+# --------------------------------------------------------------------------- #
+
+def _guess_mime(src):
+    ext = os.path.splitext(urllib.parse.urlparse(src).path)[1].lower()
+    return IMAGE_MIME.get(ext, "image/png")
+
+
+def load_image(src, allow_abs=False):
+    """Return a `data:` URI for a local path or an http(s) URL.
+
+    Local paths are sandboxed to ROOT unless allow_abs (caller-supplied --image may
+    live anywhere, like --verify; the worker's view_image tool passes allow_abs=False).
+    Raises ValueError on any failure so the caller/worker gets a clear message.
+    """
+    if not src or not str(src).strip():
+        raise ValueError("image source is required")
+    src = str(src).strip()
+    if src.startswith(("http://", "https://")):
+        req = urllib.request.Request(src, headers={"User-Agent": USER_AGENT}, method="GET")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read(MAX_IMAGE_BYTES + 1)
+            ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
+        mime = ctype if ctype.startswith("image/") else _guess_mime(src)
+    else:
+        p = os.path.realpath(src) if allow_abs else safe_path(src)
+        if not os.path.isfile(p):
+            raise ValueError(f"not a file: {src}")
+        with open(p, "rb") as f:
+            data = f.read(MAX_IMAGE_BYTES + 1)
+        mime = _guess_mime(src)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError(f"image exceeds {MAX_IMAGE_BYTES} bytes: {src}")
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _image_part(uri):
+    return {"type": "image_url", "image_url": {"url": uri}}
+
+
+def build_user_content(text, image_uris):
+    """Plain string when no images; OpenAI multimodal content array when images present."""
+    if not image_uris:
+        return text
+    return [{"type": "text", "text": text}] + [_image_part(u) for u in image_uris]
+
+
 def list_models(backend, timeout):
     """Print the model ids the backend exposes (GET /models)."""
     url = backend["base_url"].rstrip("/") + "/models"
@@ -522,16 +591,19 @@ Rules:
   style, naming, and conventions. Do not reformat unrelated code.
 - Prefer edit_file (exact-substring replace) for changes; use write_file for new files
   or full rewrites.
+- If the task refers to an image you have not been shown, call view_image with its path or
+  URL to see it. You can only see images you were given or fetched this way.
 - When done, reply with a short plain-text SUMMARY: which files you changed and what you
   did, plus anything the reviewer should check or that you could not do. No tool call in
   your final message.
 """
 
 
-def agent_loop(backend, task, max_steps, timeout):
+def agent_loop(backend, task, max_steps, timeout, image_uris=None):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"TASK:\n{task}\n\nWorking directory: {ROOT}"},
+        {"role": "user", "content": build_user_content(
+            f"TASK:\n{task}\n\nWorking directory: {ROOT}", image_uris)},
     ]
     edits = 0
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0}
@@ -560,15 +632,27 @@ def agent_loop(backend, task, max_steps, timeout):
             "content": msg.get("content") or "",
             "tool_calls": tool_calls,
         })
+        pending_images = []  # (src, uri) to attach as user turns after the tool replies
         for call in tool_calls:
             fn = call.get("function", {})
             name = fn.get("name", "")
             raw_args = fn.get("arguments") or "{}"
+            args = None
             try:
                 args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
             except ValueError:
                 result = f"Could not parse arguments as JSON: {raw_args[:200]}"
-            else:
+            if args is not None and name == "view_image":
+                src = args.get("src")
+                try:
+                    uri = load_image(src)  # tool paths sandboxed to ROOT; urls allowed
+                except Exception as e:  # noqa: BLE001 - report the failure to the model
+                    result = f"view_image failed: {e}"
+                else:
+                    pending_images.append((src, uri))
+                    result = f"Loaded image '{src}'. It is attached in the next message."
+                log(f"[step {step}] view_image({str(src)[:60]}) -> {result.splitlines()[0][:120]}")
+            elif args is not None:
                 result = run_tool(name, args)
                 if name in ("write_file", "edit_file") and not result.lower().startswith(
                     ("no change", "not a file", "old_string", "bad ")
@@ -580,6 +664,13 @@ def agent_loop(backend, task, max_steps, timeout):
                 "tool_call_id": call.get("id", ""),
                 "content": result,
             })
+        # OpenAI requires a tool reply per tool_call before any other role, so attach the
+        # requested images as user turns only once all tool replies are in.
+        for src, uri in pending_images:
+            messages.append({"role": "user", "content": [
+                {"type": "text", "text": f"Image you requested via view_image('{src}'):"},
+                _image_part(uri),
+            ]})
     log(f"[step {max_steps}] hit step limit")
     return (f"Stopped after reaching the {max_steps}-step limit. {edits} edit(s) made so far.",
             usage)
@@ -648,6 +739,9 @@ def main():
                         help="The task instruction for the worker")
     parser.add_argument("--dir", default=None, help="Repo root (default: cwd)")
     parser.add_argument("--model", default=None, help="Override the model id")
+    parser.add_argument("--image", action="append", default=None, metavar="PATH_OR_URL",
+                        help="Attach an image (local path or http(s) URL) to the task. "
+                             "Repeatable. Requires a vision-capable model.")
     parser.add_argument("--max-steps", type=int, default=None, help="Max agent steps")
     parser.add_argument("--list-models", action="store_true",
                         help="List the models this backend exposes, then exit")
@@ -680,8 +774,17 @@ def main():
     if not args.task:
         die("a task is required (or pass --list-models to browse the catalog)")
 
-    log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}")
-    summary, usage = agent_loop(backend, args.task, max_steps, timeout)
+    # Caller-supplied images may live anywhere (like --verify), so allow absolute paths.
+    image_uris = []
+    for src in (args.image or []):
+        try:
+            image_uris.append(load_image(src, allow_abs=True))
+        except Exception as e:  # noqa: BLE001
+            die(f"--image {src}: {e}")
+
+    log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}"
+        + (f" images={len(image_uris)}" if image_uris else ""))
+    summary, usage = agent_loop(backend, args.task, max_steps, timeout, image_uris)
 
     # Worker tokens ran on the free/cheap backend, not the Claude subscription.
     # Emit this before verify/commit so the trailer survives a failed verify
