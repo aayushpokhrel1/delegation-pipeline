@@ -250,11 +250,100 @@ one-liners in-session. Stop if told "don't delegate this".
 
 (The full version is in this repo's git history / the author's own CLAUDE.md.)
 
+## Combined Orchestration
+
+The delegation pipeline and Claude subagents are two ways to move work off the paid
+orchestrator. Combined orchestration routes each task to the cheapest tier that can do it,
+so Claude tokens go to planning and judgment, not typing.
+
+### The model
+
+One orchestrator, two worker tiers.
+
+- **Orchestrator** = Claude Opus in a Claude Code session. Holds the plan, writes a tight
+  per-task brief, routes each task, and adjudicates reviews. It is the only component that
+  spends Claude tokens, and it never writes implementation code itself.
+- **Tier B** = this delegation pipeline (`free` / `deepseek` / `nvidia`). Zero Claude tokens.
+  **This is the default tier** for both implementation and review.
+- **Tier A** = Claude subagents (the Agent tool: `haiku` / `sonnet` / `opus`). Costs Claude
+  tokens. An escape hatch, not a default.
+
+### Routing table
+
+Route each task on three axes. Any single axis landing in the right column sends the task to
+Tier A; otherwise it stays on Tier B.
+
+| Axis | Tier B (default, no Claude tokens) | Tier A (escalate, costs tokens) |
+|------|------------------------------------|---------------------------------|
+| **Complexity** | mechanical / boilerplate -> `delegate free`; substantial but specifiable, a whole module or a real refactor -> `delegate deepseek` | needs broad codebase judgment -> subagent `sonnet` / `opus` |
+| **Iteration depth** | verifiable in ~one shot (orchestrator runs verify once, commits) | long autonomous run-fail-edit loop, or needs a live service / Docker / the app running |
+| **Sensitivity** | ordinary code | security-sensitive, or full-context debugging (Tier A, or the orchestrator itself) |
+
+Reviews default to Tier B too: a `deepseek` worker reviews the diff against the brief for
+zero Claude tokens.
+
+### The loop (per task)
+
+1. **Brief.** The orchestrator writes a tight, self-contained brief: exact files, the change,
+   a pattern to mirror, exact values. The worker has no conversation context.
+2. **Route and run.** Pick a backend by the table and hand off. The worker edits; the CLI
+   verifies and commits on green:
+   ```bash
+   ~/.claude/bin/delegate deepseek \
+     --verify "npm test" \
+     --commit "feat: <what changed>, per brief" \
+     "<the full brief>"
+   ```
+3. **On red.** A failed verify exits 2 and commits nothing, printing the command output. The
+   orchestrator reads that output and either re-delegates with the failure folded in as a
+   sharper spec, or escalates the task to a Tier A subagent.
+4. **Review.** A second worker reviews the committed diff against the brief, for zero Claude
+   tokens:
+   ```bash
+   git show HEAD > review.diff
+   ~/.claude/bin/delegate deepseek \
+     "Review the diff in review.diff against the brief in brief.md. Report spec compliance and code quality, most severe first. Do not edit anything."
+   ```
+   The orchestrator adjudicates: accept, fix inline, or re-delegate.
+5. **Escalate.** Go to Tier A only when the loop cannot converge, or the task hits one of the
+   axes above.
+
+### The verify/commit flow
+
+`--verify "<cmd>"` runs the command after the worker finishes editing. A non-zero exit prints
+the output and exits 2 without committing. `--commit "<msg>"` stages all changes and commits,
+but only when verify passed (or no `--verify` was given). Together they make a delegated task
+self-contained: the orchestrator hands off a brief and gets back a tested, committed result,
+without babysitting the test-and-commit cycle and without spending Claude tokens on it.
+
+```bash
+# mechanical, free tier, verified and committed in one shot
+~/.claude/bin/delegate free \
+  --verify "python -m pytest tests/test_utils.py -q" \
+  --commit "test: cover utils edge cases" \
+  "Add the three missing edge-case tests to tests/test_utils.py, mirroring the table-driven style already there."
+
+# check the outcome
+echo $?   # 0 = verified and committed; 2 = verify failed, nothing committed
+```
+
+On Windows, `--verify` runs through `cmd.exe`, so pass one command (`npm test`,
+`npx tsc --noEmit`), not a bash `&&` / `;` chain.
+
+**The trust boundary holds.** The worker *model* still never runs shell or git. Only the
+caller's `--verify` and `--commit` flags run commands, and only the orchestrator sets them.
+See [Tools the worker has](#tools-the-worker-has).
+
+The [`/orchestrate`](commands/orchestrate.md) command and the `orchestrate` skill encode this
+whole table and loop, so an orchestrator invokes one thing instead of re-deriving it each
+session.
+
 ## Tools the worker has
 
 `list_dir`, `find_files`, `read_file`, `search_text`, `write_file`, `edit_file`.
 No shell, no network beyond the model endpoint, no git. File access is sandboxed to the
-working directory.
+working directory. The `--verify` / `--commit` flags are the one exception, and they are run
+by the CLI harness (the caller), never by the worker model.
 
 ## Portability
 

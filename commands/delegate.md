@@ -58,3 +58,8 @@ Follow this protocol:
 Do NOT delegate design decisions, tricky debugging, or security-sensitive code: handle
 those in-session. If `delegate` errors that a backend needs a key or that OmniRoute isn't
 running (for `free`), relay the fix instead of retrying blindly.
+
+To get a tested, committed result back in one shot, add `--verify "<cmd>" --commit "<msg>"`:
+the CLI runs the command after the worker edits and commits only on a zero exit (a non-zero
+exit exits 2 and commits nothing). The worker model still never runs shell or git. For
+routing a whole plan across the delegation pipeline and Claude subagents, use `/orchestrate`.

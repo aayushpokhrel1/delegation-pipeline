@@ -70,3 +70,31 @@ For each delegated task, Opus (cheaply, in-session) sizes it up:
 - Reliability critical -> `deepseek`.
 
 Then it writes the tight spec, runs the worker, and reviews the diff as usual.
+
+## Orchestration defaults (verify + commit)
+
+Under combined orchestration (see the README's **Combined Orchestration** section), the tier
+defaults are:
+
+- **Mechanical / boilerplate** -> `free` (`auto/coding`, or `auto/cheap` for bulk).
+- **Substantial but specifiable** (a whole module, a real refactor) -> `deepseek`, which is
+  roughly Sonnet-class for coding.
+- **Review** -> `deepseek` too. A review worker reads the diff and the brief and reports
+  spec compliance and quality, for zero Claude tokens.
+
+`--verify "<cmd>"` and `--commit "<msg>"` make a delegated task self-contained. The worker
+edits, then the CLI runs the verify command; a non-zero exit prints the output and exits 2
+without committing, and `--commit` only fires when verify passed (or no `--verify` was set).
+So the orchestrator hands off a brief and gets back a **tested, committed** result without
+spending Claude tokens on the test-and-commit cycle:
+
+```bash
+~/.claude/bin/delegate deepseek \
+  --verify "npm test" \
+  --commit "feat: add token refresh, per brief" \
+  "<the full self-contained brief>"
+```
+
+The worker **model** still never runs shell or git. Only the caller-provided `--verify` and
+`--commit` flags run commands, so the no-shell / no-git trust boundary stays intact. On
+Windows, `--verify` runs through `cmd.exe`: pass one command, not a bash `&&` / `;` chain.
