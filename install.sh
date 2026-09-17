@@ -39,8 +39,11 @@ else
 fi
 
 mkdir -p "$CMD_DIR"
-cp "$REPO_DIR/commands/delegate.md" "$CMD_DIR/delegate.md"
-echo "installed command -> $CMD_DIR/delegate.md  (use /delegate in Claude Code)"
+for f in "$REPO_DIR"/commands/*.md; do
+  cp "$f" "$CMD_DIR/"
+  echo "installed command -> $CMD_DIR/$(basename "$f")"
+done
+echo "  (use /delegate and /orchestrate in Claude Code)"
 
 echo
 echo "Done. Test it:"

@@ -43,8 +43,11 @@ if (-not (Test-Path $Config)) {
 }
 
 New-Item -ItemType Directory -Force -Path $CmdDir | Out-Null
-Copy-Item (Join-Path $RepoDir "commands\delegate.md") (Join-Path $CmdDir "delegate.md") -Force
-Write-Host "installed command  -> $CmdDir\delegate.md  (use /delegate in Claude Code)"
+Get-ChildItem (Join-Path $RepoDir "commands") -Filter *.md | ForEach-Object {
+    Copy-Item $_.FullName (Join-Path $CmdDir $_.Name) -Force
+    Write-Host "installed command  -> $CmdDir\$($_.Name)"
+}
+Write-Host "  (use /delegate and /orchestrate in Claude Code)"
 
 Write-Host ""
 Write-Host "Done. Test it:"
