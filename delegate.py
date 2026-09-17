@@ -37,6 +37,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+# Worker summaries and diffs often contain Unicode (arrows, em dashes, emoji).
+# Windows consoles default to cp1252, which raises UnicodeEncodeError on print.
+# Force UTF-8 with a safe fallback so output never crashes the run.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 # --------------------------------------------------------------------------- #
 # Config
 # --------------------------------------------------------------------------- #
