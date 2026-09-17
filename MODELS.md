@@ -40,17 +40,19 @@ Models reach end-of-life on a date and then return `HTTP 410 Gone` (e.g.
 `HTTP 404 "not found for account"` because they aren't enabled for your key. The tool
 surfaces these errors clearly, just pick another id and retry.
 
-Verified working (tool-calling drives the edit loop) as of 2026-08-26:
+Verified by an end-to-end smoke test (edit -> verify -> commit) as of 2026-09-17:
 
-| Task shape                                | Model (`--model ...`)                  | Notes                        |
-|-------------------------------------------|----------------------------------------|------------------------------|
-| **Default / fast** (cheap, clean, 3 steps)| `deepseek-ai/deepseek-v4-flash-0731`   | backend default; great pick  |
-| **Highest quality**                       | `nvidia/nemotron-3-super-120b-a12b`     | strong, more credits         |
-| **Small / cheap** bulk                    | `nvidia/nemotron-3-nano-30b-a3b`        | works, less efficient        |
+| Task shape                                | Model (`--model ...`)                  | Notes                                              |
+|-------------------------------------------|----------------------------------------|----------------------------------------------------|
+| **Default / working** (verified today)    | `nvidia/nemotron-3-super-120b-a12b`    | current backend default; edits and tool-calls cleanly |
+| **Do NOT use** (hangs)                    | `deepseek-ai/deepseek-v4-flash-0731`   | in the catalog and key is valid, but the chat call never returns (stalled 4+ min, zero steps). Was the old default. |
+| **EOL, returns HTTP 410**                 | `nvidia/nemotron-3-nano-30b-a3b`       | reached end of life 2026-09-01                     |
 
-Do NOT rely on the older `meta/llama-*`, `qwen*`, `mistralai/*-instruct` ids from earlier
-NVIDIA docs, on this account they 404 or have EOL'd. Confirm any new pick with a one-file
-smoke test before a big run.
+The old default (`deepseek-ai/deepseek-v4-flash-0731`) hung on this account, so the backend
+default is now `nvidia/nemotron-3-super-120b-a12b`. Do NOT rely on the older `meta/llama-*`,
+`qwen*`, `mistralai/*-instruct` ids from earlier NVIDIA docs either, on this account they 404
+or have EOL'd. The catalog churns fast, so **always `--list-models` first** and confirm any
+new pick with a one-file smoke test before a big run.
 
 ## Which backend first
 
@@ -65,7 +67,7 @@ For each delegated task, Opus (cheaply, in-session) sizes it up:
 - Trivial/mechanical + huge volume -> `free --model auto/cheap`, or
   `nvidia --model nvidia/nemotron-3-nano-30b-a3b` if free is dry.
 - Code-shaped -> `free --model auto/coding`, or `nvidia` default
-  (`deepseek-ai/deepseek-v4-flash-0731`) if free is dry.
+  (`nvidia/nemotron-3-super-120b-a12b`) if free is dry.
 - Needs care but not paid-tier -> `nvidia --model nvidia/nemotron-3-super-120b-a12b`.
 - Reliability critical -> `deepseek`.
 

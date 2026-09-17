@@ -81,10 +81,10 @@ still comes from the installer above (`bash install.sh` / `./install.ps1`), whic
   export NVIDIA_API_KEY=nvapi-...
   ```
   The `nvidia` backend is OpenAI-compatible via `https://integrate.api.nvidia.com/v1`.
-  It defaults to `deepseek-ai/deepseek-v4-flash-0731` (fast, verified tool-calling);
-  override per run with `--model`, e.g. `--model nvidia/nemotron-3-super-120b-a12b` for more
-  quality. The catalog changes (models EOL or are account-gated), so use `--list-models` and
-  see [`MODELS.md`](MODELS.md). This is a great **free** path when OmniRoute's routes are dry.
+  It defaults to `nvidia/nemotron-3-super-120b-a12b` (verified tool-calling); override per run
+  with `--model`. The catalog changes fast (models EOL or are account-gated, and the previous
+  `deepseek-ai/deepseek-v4-flash-0731` default now hangs), so use `--list-models` and see
+  [`MODELS.md`](MODELS.md). This is a great **free** path when OmniRoute's routes are dry.
 
   You can also plug NVIDIA into OmniRoute itself (so the `free`/`auto` router can use it):
   open `http://localhost:20128` → provider keys → add the NVIDIA key. Either way works;
