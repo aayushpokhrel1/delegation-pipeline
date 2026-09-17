@@ -1,0 +1,29 @@
+{
+  "verify_template": "python -m pytest -q {test}",
+  "tasks": [
+    {
+      "id": "subtract",
+      "tier": "mechanical",
+      "test": "tests/test_subtract.py",
+      "brief": "In calc.py, add a function `subtract(a, b)` that returns a minus b. Mirror the style of the existing `add` function. Do not change anything else."
+    },
+    {
+      "id": "docstrings",
+      "tier": "mechanical",
+      "test": "tests/test_docstrings.py",
+      "brief": "In strings.py, add a concise one-line docstring to every function (shout, whisper, repeat) describing what it does. Do not change any function's behavior."
+    },
+    {
+      "id": "money",
+      "tier": "substantial",
+      "test": "tests/test_money.py",
+      "brief": "Create a new file money.py with a `Money` class. The constructor takes (dollars, cents) and stores the total as an integer attribute `cents` (dollars*100 + cents), never a float. Support `+` and `-` between two Money instances, each returning a new Money whose `cents` is the sum/difference. Add a `format()` method returning a string like \"$3.05\" (dollars, a dot, then cents zero-padded to two digits). Use integer arithmetic throughout to avoid floating-point rounding."
+    },
+    {
+      "id": "validate",
+      "tier": "substantial",
+      "test": "tests/test_validate.py",
+      "brief": "In calc.py, make `add` and `mul` validate their inputs: if either argument is not an int or float (bool counts as non-numeric here is not required; just check int/float), raise TypeError. Keep the existing correct behavior for numeric inputs. Do not modify the test files."
+    }
+  ]
+}

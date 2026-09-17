@@ -384,6 +384,7 @@ def _parse_response(raw):
 
     content_parts = []
     tool_calls = {}  # index -> {id, function:{name, arguments}}
+    usage = None
     for line in raw.splitlines():
         line = line.strip()
         if not line.startswith("data:"):
@@ -395,7 +396,9 @@ def _parse_response(raw):
             chunk = json.loads(payload)
         except ValueError:
             continue
-        delta = chunk.get("choices", [{}])[0].get("delta", {})
+        if chunk.get("usage"):  # streamed usage lands in a late chunk
+            usage = chunk["usage"]
+        delta = (chunk.get("choices") or [{}])[0].get("delta", {})
         if delta.get("content"):
             content_parts.append(delta["content"])
         for tc in delta.get("tool_calls", []) or []:
@@ -414,7 +417,10 @@ def _parse_response(raw):
     message = {"role": "assistant", "content": "".join(content_parts)}
     if tool_calls:
         message["tool_calls"] = [tool_calls[i] for i in sorted(tool_calls)]
-    return {"choices": [{"message": message}]}
+    out = {"choices": [{"message": message}]}
+    if usage:
+        out["usage"] = usage
+    return out
 
 
 # Some upstreams (behind Cloudflare) block the default urllib signature with a
@@ -510,8 +516,15 @@ def agent_loop(backend, task, max_steps, timeout):
         {"role": "user", "content": f"TASK:\n{task}\n\nWorking directory: {ROOT}"},
     ]
     edits = 0
+    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0}
     for step in range(1, max_steps + 1):
         resp = chat_completion(backend, messages, timeout)
+        u = resp.get("usage") or {}
+        if u:
+            usage["prompt_tokens"] += u.get("prompt_tokens", 0) or 0
+            usage["completion_tokens"] += u.get("completion_tokens", 0) or 0
+            usage["total_tokens"] += u.get("total_tokens", 0) or 0
+            usage["calls"] += 1
         try:
             msg = resp["choices"][0]["message"]
         except (KeyError, IndexError):
@@ -521,7 +534,7 @@ def agent_loop(backend, task, max_steps, timeout):
         if not tool_calls:
             content = (msg.get("content") or "").strip()
             log(f"[step {step}] done ({edits} edit(s) made)")
-            return content or "(worker returned no summary)"
+            return content or "(worker returned no summary)", usage
 
         # Append the assistant turn verbatim, then answer each tool call.
         messages.append({
@@ -550,7 +563,8 @@ def agent_loop(backend, task, max_steps, timeout):
                 "content": result,
             })
     log(f"[step {max_steps}] hit step limit")
-    return f"Stopped after reaching the {max_steps}-step limit. {edits} edit(s) made so far."
+    return (f"Stopped after reaching the {max_steps}-step limit. {edits} edit(s) made so far.",
+            usage)
 
 
 def _brief(args):
@@ -649,7 +663,20 @@ def main():
         die("a task is required (or pass --list-models to browse the catalog)")
 
     log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}")
-    summary = agent_loop(backend, args.task, max_steps, timeout)
+    summary, usage = agent_loop(backend, args.task, max_steps, timeout)
+
+    # Worker tokens ran on the free/cheap backend, not the Claude subscription.
+    # Emit this before verify/commit so the trailer survives a failed verify
+    # (the benchmark reads it to tally offloaded work either way).
+    if usage["calls"]:
+        log(f"delegate: tokens prompt={usage['prompt_tokens']} "
+            f"completion={usage['completion_tokens']} total={usage['total_tokens']} "
+            f"over {usage['calls']} call(s)")
+        summary += (f"\nTOKENS: prompt={usage['prompt_tokens']} "
+                    f"completion={usage['completion_tokens']} "
+                    f"total={usage['total_tokens']} calls={usage['calls']}")
+    else:
+        summary += "\nTOKENS: unavailable (backend returned no usage)"
 
     verify_ok = True
     if args.verify:

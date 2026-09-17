@@ -6,6 +6,7 @@
 ![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-6E56CF.svg)](#install-as-a-claude-code-plugin)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/aayushpokhrel1/delegation-pipeline/pulls)
+[![Orchestrator tokens saved](https://img.shields.io/badge/orchestrator%20tokens-~86%25%20saved-brightgreen.svg)](#proof-it-measurably-cuts-orchestrator-tokens)
 
 Offload token-heavy grunt work from your paid Claude Code session to **free or cheap
 models**, so your Claude usage goes to the thinking, not the typing.
@@ -20,6 +21,44 @@ orchestrator) review the resulting `git diff` and commit.
 ```
 
 ![demo](assets/demo.gif)
+
+## Proof: it measurably cuts orchestrator tokens
+
+Not just a claim. [`bench/`](bench/) runs a reproducible A/B where every task is done two
+ways and measured from real OpenAI-compatible `usage` fields, and each result is gated by a
+pytest that fails until the work is actually correct, so a row only counts if the change
+really worked.
+
+**savings% = 1 - T_review / T_do**: when it delegates, the orchestrator pays only `T_review`
+(write a brief + skim the diff) instead of `T_do` (doing the whole task itself). The ratio is
+model-independent, so it transfers to your Opus orchestrator without needing a Claude key.
+
+| Task | Tier | T_do (do it inline) | T_review (delegate) | **Savings** | Offloaded to cheap tier |
+|------|------|--------------------:|--------------------:|:-----------:|------------------------:|
+| subtract   | mechanical  |  3,241 |   828 | **74.5%** |  3,306 |
+| docstrings | mechanical  |  6,349 |   861 | **86.4%** |  4,516 |
+| money      | substantial |  7,048 | 1,009 | **85.7%** |  2,619 |
+| validate   | substantial | 12,977 |   956 | **92.6%** |  9,880 |
+
+**Median: ~86% fewer orchestrator tokens per task** (74-93% band across runs at temperature
+0.2), with ~20k tokens of real coding work pushed onto the cheap tier. All four tasks passed
+both arms (`inline ok` / `worker ok`).
+
+A real datapoint from building this benchmark: `bench/run_bench.py` itself (~250 lines,
+stdlib only) was written by a `deepseek` worker that consumed **109,058 tokens**; the Opus
+orchestrator paid only the brief plus one diff review, the same asymmetry, on the real
+orchestrator, on a non-toy file.
+
+Reproduce it in under a minute:
+
+```bash
+pip install pytest
+python bench/run_bench.py --worker deepseek --baseline deepseek   # or --worker free
+```
+
+Every run also prints a per-task `TOKENS: total=… ` trailer (work that ran off your
+subscription) and rewrites [`bench/RESULTS.md`](bench/RESULTS.md). Full methodology and the
+honest caveats live in [`bench/README.md`](bench/README.md).
 
 ## Backends
 
