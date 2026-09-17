@@ -282,6 +282,12 @@ Tier A; otherwise it stays on Tier B.
 Reviews default to Tier B too: a `deepseek` worker reviews the diff against the brief for
 zero Claude tokens.
 
+**Cost gate.** Delegation is not free of the orchestrator's tokens: the brief, the review,
+and any re-run all cost Claude tokens. Before routing a task to Tier B, the orchestrator
+weighs that overhead against doing it inline, and keeps the task in-session when the brief
+plus review would cost as much as the edit itself. The pipeline only saves tokens when the
+work is bulkier than its description, which is why one-liners stay in-session.
+
 ### The loop (per task)
 
 1. **Brief.** The orchestrator writes a tight, self-contained brief: exact files, the change,

@@ -33,6 +33,11 @@ Any single axis landing in the escalate column sends that task to Tier A; otherw
 Reviews default to Tier B (`deepseek`). Pick backend/model per `MODELS.md` and
 `delegate <backend> --list-models`.
 
+**Cost gate (your call).** Delegation spends *your* tokens on the brief, the review, and any
+re-run. Before routing to Tier B, weigh that against doing the task inline; if the brief plus
+review would cost as much as or more than the edit itself, do it inline. The pipeline only
+saves tokens when the work is bulkier than its description, so one-liners stay in-session.
+
 ## The loop (per task)
 
 1. **Brief.** Tight and self-contained: exact files, the change, a pattern to mirror, exact

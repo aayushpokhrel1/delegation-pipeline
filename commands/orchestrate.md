@@ -34,6 +34,12 @@ Any single axis landing in the "escalate" column sends that task to Tier A. Othe
 Reviews default to Tier B (`deepseek`) as well. Pick the backend/model per `MODELS.md` and
 `delegate <backend> --list-models`; state your choice and why in one line before running.
 
+**Cost gate (your call).** Delegation is not free of *your* tokens: the brief, the review,
+and any re-run all cost Claude tokens. Before routing a task to Tier B, weigh that overhead
+against just doing it inline. If the brief plus review would cost as much as or more than the
+inline edit, do it inline. The pipeline only saves tokens when the work is bulkier than its
+description, which is why one-liners and edits smaller than their own spec stay in-session.
+
 ## The loop, per task
 
 1. **Brief.** Write a tight, self-contained brief: exact files, the precise change, a pattern
