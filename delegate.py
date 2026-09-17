@@ -4,13 +4,22 @@ delegate.py - a zero-dependency headless coding worker.
 
 Runs a cheap/free model over any OpenAI-compatible endpoint (OmniRoute, DeepSeek,
 Kimi/Moonshot) as a small agentic loop. The worker can read, search, and edit files
-in the current repo. It CANNOT run shell commands or touch git. It prints a summary
-of what it did to stdout; step logs go to stderr.
+in the current repo. The worker model itself CANNOT run shell commands or touch git.
+The CLI harness can, but only via the caller-provided --verify and --commit flags
+(never the model), so the trust boundary stays intact. It prints a summary of what
+it did to stdout; step logs go to stderr.
 
 Usage:
     delegate.py <backend> "<task>"
     delegate.py free "Add docstrings to every function in src/utils.py"
     delegate.py deepseek "Convert callbacks to async/await in api/client.py" --dir .
+    delegate.py free --verify "npm test" --commit "feat: x" "Implement x per spec"
+
+--verify runs the given command after the worker edits; a non-zero exit prints the
+command output and exits 2 without committing. --commit stages all changes and
+commits, but only when verify passed (or no --verify was set). This lets the
+orchestrator hand off a task and get back a tested, committed result at no Claude
+token cost, while the worker model itself still never runs shell or git.
 
 Backends are defined in ~/.claude/delegate.config.json (see config.example.json).
 Only the Python standard library is used, so this runs anywhere Python 3.8+ exists.
@@ -21,6 +30,7 @@ import fnmatch
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -543,6 +553,47 @@ def _brief(args):
 
 
 # --------------------------------------------------------------------------- #
+# Verify + commit (CLI harness only; the worker model never runs these)
+# --------------------------------------------------------------------------- #
+
+def run_verify(cmd, timeout):
+    """Run the caller-provided verify command in ROOT. Returns (ok, output)."""
+    try:
+        proc = subprocess.run(
+            cmd, shell=True, cwd=ROOT, capture_output=True, text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"verify command timed out after {timeout}s"
+    except Exception as e:  # noqa: BLE001
+        return False, f"verify command could not run: {e}"
+    out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    return proc.returncode == 0, out
+
+
+def git_commit(message):
+    """Stage all changes and commit in ROOT. Returns (ok, info) where info is a
+    short sha on success or the reason it was skipped/failed."""
+    try:
+        add = subprocess.run(["git", "add", "-A"], cwd=ROOT,
+                             capture_output=True, text=True)
+        if add.returncode != 0:
+            return False, (add.stderr or "git add failed").strip()
+        # git diff --cached --quiet exits 0 when there is nothing staged.
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
+            return False, "nothing to commit (worker made no committable change)"
+        commit = subprocess.run(["git", "commit", "-m", message], cwd=ROOT,
+                               capture_output=True, text=True)
+        if commit.returncode != 0:
+            return False, (commit.stderr or commit.stdout or "git commit failed").strip()
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                            capture_output=True, text=True).stdout.strip()
+        return True, sha
+    except Exception as e:  # noqa: BLE001
+        return False, f"git commit error: {e}"
+
+
+# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 
@@ -559,6 +610,12 @@ def main():
     parser.add_argument("--max-steps", type=int, default=None, help="Max agent steps")
     parser.add_argument("--list-models", action="store_true",
                         help="List the models this backend exposes, then exit")
+    parser.add_argument("--verify", default=None,
+                        help="Command to run after editing (e.g. 'npm test'). "
+                             "A non-zero exit prints the output and skips the commit.")
+    parser.add_argument("--commit", default=None,
+                        help="On success (verify passed, or no --verify) git add -A "
+                             "and commit with this message.")
     args = parser.parse_args()
 
     global ROOT
@@ -584,6 +641,26 @@ def main():
 
     log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}")
     summary = agent_loop(backend, args.task, max_steps, timeout)
+
+    verify_ok = True
+    if args.verify:
+        log(f"delegate: verify: {args.verify}")
+        verify_ok, out = run_verify(args.verify, timeout)
+        tail = "\n".join(out.splitlines()[-40:])
+        log(f"delegate: verify {'PASSED' if verify_ok else 'FAILED'}")
+        if not verify_ok:
+            print(summary)
+            print(f"\n--- VERIFY FAILED: {args.verify} ---")
+            print(tail)
+            sys.exit(2)
+        summary += f"\n--- VERIFY PASSED: {args.verify} ---"
+
+    if args.commit and verify_ok:
+        ok, info = git_commit(args.commit)
+        log(f"delegate: commit {'ok ' + info if ok else 'skipped: ' + info}")
+        summary += (f"\n--- COMMITTED {info} ---" if ok
+                    else f"\n--- COMMIT SKIPPED: {info} ---")
+
     print(summary)
 
 
