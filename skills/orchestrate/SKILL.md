@@ -30,8 +30,9 @@ Any single axis landing in the escalate column sends that task to Tier A; otherw
 - **Sensitivity:** ordinary code -> Tier B; security-sensitive or full-context debugging ->
   Tier A or the orchestrator itself.
 
-Reviews default to Tier B (`deepseek`). Pick backend/model per `MODELS.md` and
-`delegate <backend> --list-models`.
+Reviews default to Tier B (`deepseek`). Pick backend/model from the live catalog
+(`delegate <backend> --list-models`); the delegation-pipeline repo's `MODELS.md` has the
+current shortlist.
 
 **Cost gate (your call).** Delegation spends *your* tokens on the brief, the review, and any
 re-run. Before routing to Tier B, weigh that against doing the task inline; if the brief plus
