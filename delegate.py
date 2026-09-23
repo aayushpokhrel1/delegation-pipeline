@@ -692,7 +692,7 @@ def run_verify(cmd, timeout):
     """Run the caller-provided verify command in ROOT. Returns (ok, output)."""
     try:
         proc = subprocess.run(
-            cmd, shell=True, cwd=ROOT, capture_output=True, text=True,
+            cmd, shell=True, cwd=ROOT, capture_output=True, encoding="utf-8", errors="replace",
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
@@ -708,18 +708,18 @@ def git_commit(message):
     short sha on success or the reason it was skipped/failed."""
     try:
         add = subprocess.run(["git", "add", "-A"], cwd=ROOT,
-                             capture_output=True, text=True)
+                             capture_output=True, encoding="utf-8", errors="replace")
         if add.returncode != 0:
             return False, (add.stderr or "git add failed").strip()
         # git diff --cached --quiet exits 0 when there is nothing staged.
         if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
             return False, "nothing to commit (worker made no committable change)"
         commit = subprocess.run(["git", "commit", "-m", message], cwd=ROOT,
-                               capture_output=True, text=True)
+                               capture_output=True, encoding="utf-8", errors="replace")
         if commit.returncode != 0:
             return False, (commit.stderr or commit.stdout or "git commit failed").strip()
         sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, encoding="utf-8", errors="replace").stdout.strip()
         return True, sha
     except Exception as e:  # noqa: BLE001
         return False, f"git commit error: {e}"

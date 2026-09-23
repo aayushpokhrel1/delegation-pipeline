@@ -2,6 +2,7 @@
 """Framework-free checks for delegate.py's pure helpers (no network). Run: python test_delegate.py"""
 import base64
 import os
+import sys
 import tempfile
 
 import delegate
@@ -45,6 +46,19 @@ def test_load_image_missing_raises():
     except ValueError:
         return
     raise AssertionError("expected ValueError for missing file")
+
+
+def test_run_verify_handles_non_ascii_output():
+    """Verify output is UTF-8; decoding it as the locale codepage used to fail (Windows cp1252)."""
+    delegate.ROOT = tempfile.mkdtemp()
+    script = os.path.join(delegate.ROOT, "emit.py")
+    with open(script, "w", encoding="utf-8") as f:
+        f.write("import sys\n"
+                "sys.stdout.reconfigure(encoding='utf-8')\n"
+                "print('\u2713 passed \u00d7 1 \u2502')\n")
+    ok, out = delegate.run_verify(f'"{sys.executable}" "{script}"', 30)
+    assert ok, out
+    assert "✓" in out, out
 
 
 if __name__ == "__main__":
