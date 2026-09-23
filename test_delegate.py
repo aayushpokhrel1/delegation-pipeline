@@ -53,12 +53,16 @@ def test_run_verify_handles_non_ascii_output():
     delegate.ROOT = tempfile.mkdtemp()
     script = os.path.join(delegate.ROOT, "emit.py")
     with open(script, "w", encoding="utf-8") as f:
+        # U+276F (vitest's failing-file marker) encodes as e2 9d af. 0x9d is one
+        # of only five bytes cp1252 cannot decode, which is what made the original
+        # traceback fire. Characters like the check mark decode to mojibake
+        # instead and never raise, so they do not exercise the bug.
         f.write("import sys\n"
                 "sys.stdout.reconfigure(encoding='utf-8')\n"
-                "print('\u2713 passed \u00d7 1 \u2502')\n")
+                "sys.stdout.write('\u276f ok\\n')\n")
     ok, out = delegate.run_verify(f'"{sys.executable}" "{script}"', 30)
     assert ok, out
-    assert "✓" in out, out
+    assert "❯" in out, out
 
 
 if __name__ == "__main__":
