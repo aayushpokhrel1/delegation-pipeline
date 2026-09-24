@@ -651,14 +651,14 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None):
                 else:
                     pending_images.append((src, uri))
                     result = f"Loaded image '{src}'. It is attached in the next message."
-                log(f"[step {step}] view_image({str(src)[:60]}) -> {result.splitlines()[0][:120]}")
+                log(f"[step {step}] view_image({str(src)[:60]}) -> {(result.splitlines() or [''])[0][:120]}")
             elif args is not None:
                 result = run_tool(name, args)
                 if name in ("write_file", "edit_file") and not result.lower().startswith(
                     ("no change", "not a file", "old_string", "bad ")
                 ):
                     edits += 1
-                log(f"[step {step}] {name}({_brief(args)}) -> {result.splitlines()[0][:120]}")
+                log(f"[step {step}] {name}({_brief(args)}) -> {(result.splitlines() or [''])[0][:120]}")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.get("id", ""),

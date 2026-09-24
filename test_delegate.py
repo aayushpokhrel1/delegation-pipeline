@@ -65,6 +65,21 @@ def test_run_verify_handles_non_ascii_output():
     assert "❯" in out, out
 
 
+def test_agent_loop_survives_empty_tool_result():
+    """A tool returning "" used to crash the log line ([0] on an empty splitlines())."""
+    delegate.ROOT = tempfile.mkdtemp()
+    with open(os.path.join(delegate.ROOT, "empty.txt"), "w"):
+        pass
+    replies = [
+        {"choices": [{"message": {"content": "", "tool_calls": [
+            {"id": "1", "function": {"name": "read_file",
+                                     "arguments": '{"path": "empty.txt"}'}}]}}]},
+        {"choices": [{"message": {"content": "done"}}]},
+    ]
+    delegate.chat_completion = lambda *a, **k: replies.pop(0)
+    summary, _ = delegate.agent_loop("free", "read it", 5, 30)
+    assert summary == "done", summary
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
