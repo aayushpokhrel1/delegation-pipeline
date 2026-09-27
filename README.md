@@ -110,12 +110,18 @@ which a plugin cannot ship. Run both once on a new device.
 
 ### Keys
 
-- **free**: no key. Just run OmniRoute in another terminal:
-  ```bash
-  npx omniroute      # serves http://localhost:20128/v1
+- **free**: needs a local OmniRoute gateway *and*, on current OmniRoute (3.8.50+), an API
+  key. Set up autostart (below) so the gateway is always there, then create a key at
+  `http://localhost:20128/dashboard/api-manager` and put it in `delegate.config.json`:
+  ```json
+  "free": { "base_url": "http://localhost:20128/v1", "api_key": "...", "model": "auto/coding" }
   ```
-  Or have it start automatically at every logon (Windows), see
-  [Autostart](#autostart-windows) below.
+  The key is shown once at creation (`ALLOW_API_KEY_REVEAL=false`), so copy it there and then.
+  Older docs (and OmniRoute's own startup banner, plus `REQUIRE_API_KEY=false` in its `.env`)
+  claim the local gateway is keyless. It is not: `/v1/*` always requires a Bearer key, and
+  Settings > Security states that authorization model with no toggle to turn it off. Without a
+  key `delegate` sends no `Authorization` header at all and every call fails
+  `401 invalid_api_key`, which looks exactly like "OmniRoute is down".
 - **deepseek / kimi**: set env vars, or paste the key into `delegate.config.json`
   (that file is git-ignored):
   ```bash
@@ -152,6 +158,28 @@ which a plugin cannot ship. Run both once on a new device.
 So you never have to start the gateway by hand. Logs land in `~/.claude/omniroute.log`,
 and every installer prefers a global `omniroute` (`npm i -g omniroute`) and falls back to
 `npx --yes omniroute`.
+
+**Install OmniRoute globally, don't rely on the npx fallback.** `npx` re-extracts the package
+and discards Next's `.next` build cache on every launch, which maximises the cold-start cost
+below. On npm 11+ the global install silently skips lifecycle scripts, leaving native deps
+(`koffi`, `keytar`, `onnxruntime-node`, `esbuild`) unbuilt; if you see an `install-scripts`
+warning, re-run with the `--allow-scripts=<list>` that npm prints.
+
+**The starter warms the gateway's routes before exiting.** OmniRoute ships as a Next.js *dev*
+server, so every route compiles on its first request after a restart: cold on Windows,
+`/api/monitoring/health` takes over 90s and `/v1/models` about 10s, both under 0.1s once warm.
+Whichever client calls first otherwise pays that bill, times out, and reports the gateway
+"down" while it is really just compiling. OmniRoute's own CLI hits this too: its readiness
+probe hardcodes 60s, so `npx omniroute` often prints "Server did not respond within 60s" about
+a server that comes up fine seconds later. Treat that warning as noise, and check
+`curl http://127.0.0.1:20128/api/monitoring/health` instead.
+
+Because the warm-up waits out that compile, a cold `start-omniroute.ps1` can take a few
+minutes before it exits. That is fine for a hidden logon task where nobody is waiting, and it
+is the whole point: the task eats the latency so your sessions never do.
+
+The Windows task runs the starter *from this repo's path*, so moving or renaming the checkout
+breaks autostart. Re-run `install-autostart.ps1` afterwards.
 
 **Windows** (Scheduled Task, launches hidden at logon):
 ```powershell
