@@ -32,15 +32,23 @@ function Warm-Routes {
     $paths  = @("/api/monitoring/health", "/v1/models")
     $warmed = 0
     foreach ($path in $paths) {
-        try {
-            Invoke-WebRequest -Uri "http://127.0.0.1:$Port$path" -TimeoutSec $TimeoutSec -UseBasicParsing | Out-Null
-            $warmed++
-        } catch {
-            # An HTTP error response (e.g. 401 from /v1/models when REQUIRE_API_KEY
-            # is set) still means the route compiled. Only a transport-level failure
-            # with no response at all counts as not warmed.
-            if ($_.Exception.Response) { $warmed++ }
-            else { Write-Host "Warm request to $path failed: $($_.Exception.Message)" }
+        # Two attempts. A cold compile can outlast TimeoutSec, in which case the
+        # request gives up while the server keeps compiling; the retry then lands
+        # on the now-warm route. Without it the starter exits non-zero on a
+        # gateway that is actually fine, and a false alarm here teaches you to
+        # ignore the real ones.
+        for ($attempt = 1; $attempt -le 2; $attempt++) {
+            try {
+                Invoke-WebRequest -Uri "http://127.0.0.1:$Port$path" -TimeoutSec $TimeoutSec -UseBasicParsing | Out-Null
+                $warmed++
+                break
+            } catch {
+                # An HTTP error response (e.g. 401 from /v1/models, which needs a
+                # Bearer key) still means the route compiled. Only a transport-level
+                # failure with no response at all counts as not warmed.
+                if ($_.Exception.Response) { $warmed++; break }
+                if ($attempt -eq 2) { Write-Host "Warm request to $path failed twice: $($_.Exception.Message)" }
+            }
         }
     }
     Write-Host "Warmed $warmed/$($paths.Count) OmniRoute routes on port $Port"
