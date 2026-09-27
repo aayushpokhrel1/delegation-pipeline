@@ -245,8 +245,9 @@ def summarize_ledger(rows):
     }
 
 
-def print_stats():
-    """Read the ledger and print the running savings tally to stdout."""
+def read_ledger():
+    """Return the ledger rows as a list of dicts. Missing file or corrupt lines
+    yield fewer rows rather than an error."""
     rows = []
     try:
         with open(LEDGER_PATH, "r", encoding="utf-8") as f:
@@ -259,7 +260,13 @@ def print_stats():
                 except ValueError:
                     continue
     except OSError:
-        rows = []
+        return []
+    return rows
+
+
+def print_stats():
+    """Read the ledger and print the running savings tally to stdout."""
+    rows = read_ledger()
 
     if not rows:
         print(f"delegate usage ledger is empty (no runs recorded yet): {LEDGER_PATH}")
@@ -287,6 +294,127 @@ def print_stats():
             print(f"  {key.ljust(width)}   {format(slot['runs'], ',')} runs   "
                   f"{format(slot['total'], ',')} tokens")
         print()
+
+
+# --------------------------------------------------------------------------- #
+# README stats block (public-facing; never names a repo)
+# --------------------------------------------------------------------------- #
+
+START_MARKER = "<!-- delegate-stats:start -->"
+END_MARKER = "<!-- delegate-stats:end -->"
+
+
+def _bar(frac, width=20):
+    """A fixed-width unicode bar for a 0..1 fraction."""
+    if frac is None:
+        frac = 0.0
+    frac = min(1.0, max(0.0, frac))
+    filled = round(frac * width)
+    return "\u2588" * filled + "\u2591" * (width - filled)
+
+
+def stats_markdown(s):
+    """Render a summarize_ledger() result as a public-facing Markdown block.
+    Pure: no file access, no repo names in the output, only a repo count."""
+    runs = s["runs"]
+    repos = len(s["by_repo"])
+    total = s["total"]
+    pct = round((1 - REVIEW_RATIO) * 100, 1)
+    review_pct = round(REVIEW_RATIO * 100, 1)
+    date = time.strftime("%Y-%m-%d", time.gmtime())
+
+    lines = [
+        "### Measured impact",
+        "",
+        f"_Generated {date} from {format(runs, ',')} delegated "
+        f"{'run' if runs == 1 else 'runs'} across {repos} "
+        f"{'repo' if repos == 1 else 'repos'}._",
+        "",
+        "| Metric | Value |",
+        "| --- | --- |",
+        f"| Runs delegated | {format(runs, ',')} |",
+        f"| Tokens offloaded to workers | {format(total, ',')} (measured) |",
+        f"| Worker API calls | {format(s['calls'], ',')} |",
+        f"| Paid on the worker tier | ${s['worker_usd']:.2f} |",
+        f"| Claude tokens avoided | ~{format(s['avoided'], ',')} (estimated) |",
+        f"| Opus-equivalent value | ~${s['avoided_usd']:.2f} |",
+    ]
+
+    if total:
+        lines += ["", "By backend:", "", "```"]
+        width = max([len(k) for k in s["by_backend"]] + [0])
+        for key, slot in sorted(s["by_backend"].items(),
+                                key=lambda kv: -kv[1]["total"]):
+            frac = slot["total"] / total
+            share = round(frac * 100)
+            lines.append(f"{key.ljust(width)}  {_bar(frac)}  "
+                         f"{str(share).rjust(3)}%   "
+                         f"{format(slot['total'], ',')} tokens")
+        lines += ["```", "", "By month:", "", "```"]
+        width = max([len(k) for k in s["by_month"]] + [0])
+        peak = max([slot["total"] for slot in s["by_month"].values()] + [0])
+        for key, slot in sorted(s["by_month"].items()):
+            frac = (slot["total"] / peak) if peak else 0.0
+            lines.append(f"{key.ljust(width)}  {_bar(frac)}   "
+                         f"{format(slot['total'], ',')} tokens")
+        lines.append("```")
+
+    lines += [
+        "",
+        "Offloaded tokens and worker calls are measured from each backend's own usage",
+        f'fields. "Claude tokens avoided" is an estimate: {pct}% of the offloaded total,',
+        "using the median review ratio from [`bench/RESULTS.md`](bench/RESULTS.md)",
+        f"(reviewing a worker's diff costs about {review_pct}% of doing the task inline). Dollar",
+        "figures are rough blended per-tier prices, for scale, not billing.",
+    ]
+    return "\n".join(lines)
+
+
+def replace_stats_region(text, block):
+    """Return `text` with the content between the markers replaced by `block`.
+    Returns None when either marker is missing. Idempotent: replacing twice with
+    the same block yields the same text."""
+    start = text.find(START_MARKER)
+    if start < 0:
+        return None
+    end = text.find(END_MARKER, start + len(START_MARKER))
+    if end < 0:
+        return None
+    return (text[:start + len(START_MARKER)] + "\n\n" + block + "\n\n"
+            + text[end:])
+
+
+def write_readme_stats(path="README.md"):
+    """Refresh the stats block in `path` from the ledger."""
+    rows = read_ledger()
+    if not rows:
+        print(f"delegate usage ledger is empty (no runs recorded yet): {LEDGER_PATH}")
+        return
+    block = stats_markdown(summarize_ledger(rows))
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            text = f.read()
+    except OSError as e:
+        die(f"could not read {path}: {e}")
+    new_text = replace_stats_region(text, block)
+    if new_text is None:
+        print(block)
+        print()
+        print(f"delegate: {path} has no stats markers. Paste these two lines into "
+              f"the README once, then re-run:")
+        print(f"  {START_MARKER}")
+        print(f"  {END_MARKER}")
+        return
+    if new_text == text:
+        print(f"delegate: stats block in {path} is already up to date")
+        return
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(new_text)
+    except OSError as e:
+        die(f"could not write {path}: {e}")
+    print(f"delegate: refreshed stats block in {path} from "
+          f"{format(len(rows), ',')} ledger run(s)")
 
 
 # --------------------------------------------------------------------------- #
@@ -881,6 +1009,9 @@ def main():
     parser.add_argument("--stats", action="store_true",
                         help="Print the running token-savings tally from the "
                              "usage ledger, then exit")
+    parser.add_argument("--readme", action="store_true",
+                        help="With --stats: refresh the generated stats block in "
+                             "README.md instead of printing to the terminal")
     parser.add_argument("--verify", default=None,
                         help="Command to run after editing (e.g. 'npm test'). "
                              "A non-zero exit prints the output and skips the commit.")
@@ -890,7 +1021,10 @@ def main():
     args = parser.parse_args()
 
     if args.stats:
-        print_stats()
+        if args.readme:
+            write_readme_stats()
+        else:
+            print_stats()
         return
     if not args.backend:
         parser.error("backend is required")

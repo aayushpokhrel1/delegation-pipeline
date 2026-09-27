@@ -142,6 +142,62 @@ def test_record_run_roundtrip():
         delegate.LEDGER_PATH = original
 
 
+def test_stats_markdown_omits_repo_names():
+    rows = [
+        {"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "secret-client-repo", "prompt": 100, "completion": 50, "total": 150,
+         "calls": 2},
+        {"ts": "2026-09-15T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "another-private-thing", "prompt": 200, "completion": 100, "total": 300,
+         "calls": 3},
+        {"ts": "2026-09-27T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "another-private-thing", "prompt": 400, "completion": 200, "total": 600,
+         "calls": 4},
+    ]
+    s = delegate.summarize_ledger(rows)
+    md = delegate.stats_markdown(s)
+    assert "secret-client-repo" not in md
+    assert "another-private-thing" not in md
+    assert "2 repos" in md, md
+    assert "deepseek" in md
+    assert "free" in md
+    assert "### Measured impact" in md
+
+
+def test_stats_markdown_handles_empty_totals():
+    rows = [
+        {"ts": "2026-09-01T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "alpha", "prompt": 0, "completion": 0, "total": 0, "calls": 0},
+        {"ts": "2026-09-02T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "beta", "prompt": 0, "completion": 0, "total": 0, "calls": 0},
+    ]
+    md = delegate.stats_markdown(delegate.summarize_ledger(rows))
+    assert "| Metric | Value |" in md
+    assert "```" not in md  # both fenced blocks are skipped when total is 0
+
+
+def test_replace_stats_region_idempotent():
+    text = ("# Title\n\n" + delegate.START_MARKER + "\n\nold\n\n"
+            + delegate.END_MARKER + "\n\n## Next\n")
+    once = delegate.replace_stats_region(text, "BLOCK")
+    twice = delegate.replace_stats_region(once, "BLOCK")
+    assert once == twice
+    assert once.count("BLOCK") == 1
+    assert "old" not in once
+    assert "## Next" in once
+    assert delegate.replace_stats_region("# no markers here\n", "BLOCK") is None
+    reversed_text = (delegate.END_MARKER + "\n\n" + delegate.START_MARKER + "\n")
+    assert delegate.replace_stats_region(reversed_text, "BLOCK") is None
+
+
+def test_bar_clamps():
+    bars = [delegate._bar(0), delegate._bar(1), delegate._bar(2.5), delegate._bar(-1)]
+    assert len({len(b) for b in bars}) == 1
+    assert delegate._bar(1) == "\u2588" * 20
+    assert "\u2588" not in delegate._bar(0)
+    assert delegate._bar(None) == delegate._bar(0)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
