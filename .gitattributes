@@ -3,3 +3,7 @@
 delegate.py text eol=lf
 *.ps1 text eol=crlf
 graphify-out/graph.json merge=graphify
+
+# The published ledger snapshot is written with LF by write_snapshot(); keeping it
+# LF in the worktree too stops every refresh from producing a line-ending-only diff.
+*.jsonl text eol=lf
