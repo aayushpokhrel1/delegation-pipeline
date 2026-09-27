@@ -22,6 +22,41 @@ orchestrator) review the resulting `git diff` and commit.
 
 ![demo](assets/demo.gif)
 
+<!-- delegate-stats:start -->
+
+### Measured impact
+
+_Generated 2026-09-27 from 2 delegated runs across 1 repo._
+
+| Metric | Value |
+| --- | --- |
+| Runs delegated | 2 |
+| Tokens offloaded to workers | 932,100 (measured) |
+| Worker API calls | 33 |
+| Paid on the worker tier | $0.26 |
+| Claude tokens avoided | ~802,538 (estimated) |
+| Opus-equivalent value | ~$12.04 |
+
+By backend:
+
+```
+deepseek  ████████████████████  100%   932,100 tokens
+```
+
+By month:
+
+```
+2026-09  ████████████████████   932,100 tokens
+```
+
+Offloaded tokens and worker calls are measured from each backend's own usage
+fields. "Claude tokens avoided" is an estimate: 86.1% of the offloaded total,
+using the median review ratio from [`bench/RESULTS.md`](bench/RESULTS.md)
+(reviewing a worker's diff costs about 13.9% of doing the task inline). Dollar
+figures are rough blended per-tier prices, for scale, not billing.
+
+<!-- delegate-stats:end -->
+
 ## Proof: it measurably cuts orchestrator tokens
 
 Not just a claim. [`bench/`](bench/) runs a reproducible A/B where every task is done two
@@ -278,6 +313,11 @@ dollar figures are rough blended per-tier prices, useful for a sense of scale, n
 
 The file is plain JSONL, one run per line, so it can be grepped, piped into `jq`, or deleted
 freely. Deleting it just resets the tally; nothing else depends on it.
+
+`delegate --stats --readme` regenerates the "Measured impact" block at the top of this README
+from the ledger. It never includes repository names, only a count of how many repos are
+involved, so the block is safe to publish. A weekly scheduled task can keep it current:
+`scripts/install-stats-task.ps1` registers it on Windows.
 
 ### Letting Claude pick the model
 
