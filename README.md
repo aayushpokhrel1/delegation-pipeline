@@ -26,27 +26,27 @@ orchestrator) review the resulting `git diff` and commit.
 
 ### Measured impact
 
-_Generated 2026-09-27 from 3 delegated runs across 1 repo._
+_Generated 2026-09-27 from 5 delegated runs across 1 repo._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 3 |
-| Tokens offloaded to workers | 2,036,674 (measured) |
-| Worker API calls | 61 |
-| Paid on the worker tier | $0.57 |
-| Claude tokens avoided | ~1,753,576 (estimated) |
-| Opus-equivalent value | ~$26.30 |
+| Runs delegated | 5 |
+| Tokens offloaded to workers | 2,859,887 (measured) |
+| Worker API calls | 84 |
+| Paid on the worker tier | $0.80 |
+| Claude tokens avoided | ~2,462,363 (estimated) |
+| Opus-equivalent value | ~$36.94 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   2,036,674 tokens
+deepseek  ████████████████████  100%   2,859,887 tokens
 ```
 
 By month:
 
 ```
-2026-09  ████████████████████   2,036,674 tokens
+2026-09  ████████████████████   2,859,887 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
@@ -295,7 +295,8 @@ Step logs stream to **stderr**; the final **summary** prints to **stdout**.
 Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override),
 `--image <path|url>` (attach an image, repeatable, needs a vision model; the worker can also
 fetch images mid-task via its `view_image` tool), `--max-steps N`, `--list-models` (print the
-backend's catalog and exit), `--stats` (print the running savings tally and exit), plus
+backend's catalog and exit), `--stats` (print the running savings tally and exit), `--ledger <path>` (read the ledger
+from somewhere else, e.g. the published snapshot), plus
 `--verify` / `--commit` (below).
 
 ### The usage ledger
@@ -329,6 +330,9 @@ means anyone can recompute the published table from the repo alone:
 ```bash
 python delegate.py --stats --ledger bench/ledger-snapshot.jsonl
 ```
+
+Redaction costs exactly one thing: with repo names stripped, a recompute from the snapshot
+reports a single repo instead of the real count. Every token figure matches to the digit.
 
 `delegate --stats --readme` regenerates the "Measured impact" block at the top of this README
 from the ledger. It never includes repository names, only a count of how many repos are

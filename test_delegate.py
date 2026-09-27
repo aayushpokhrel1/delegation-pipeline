@@ -269,7 +269,7 @@ def test_stats_markdown_publishes_range():
     md = delegate.stats_markdown(delegate.summarize_ledger(rows))
     assert str(delegate.BENCH_SAVINGS_MIN) in md, md
     assert str(delegate.BENCH_SAVINGS_MAX) in md, md
-    assert str(delegate.BENCH_TASK_COUNT) in md, md
+    assert f"median of {delegate.BENCH_TASK_COUNT} benchmark tasks" in md, md
     assert "bench/ledger-snapshot.jsonl" in md, md
     assert "python delegate.py --stats --ledger bench/ledger-snapshot.jsonl" in md, md
 
@@ -296,7 +296,9 @@ def test_bench_constants_match_results_file():
 
     assert len(savings) == delegate.BENCH_TASK_COUNT, (
         f"bench/RESULTS.md has {len(savings)} task rows but BENCH_TASK_COUNT is "
-        f"{delegate.BENCH_TASK_COUNT}; update BENCH_TASK_COUNT in delegate.py")
+        f"{delegate.BENCH_TASK_COUNT}; update BENCH_TASK_COUNT in delegate.py "
+        "(0 rows usually means the results table gained or lost a column, so the "
+        "8-field row check above needs updating too)")
     assert min(savings) == delegate.BENCH_SAVINGS_MIN, (
         f"bench/RESULTS.md minimum savings is {min(savings)} but BENCH_SAVINGS_MIN is "
         f"{delegate.BENCH_SAVINGS_MIN}; update BENCH_SAVINGS_MIN in delegate.py")
