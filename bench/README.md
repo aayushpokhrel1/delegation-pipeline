@@ -46,6 +46,18 @@ row only counts if the change really worked (`inline ok` / `worker ok` = yes).
 Requires `pip install pytest` and a usable backend key. Numbers vary run to run (temperature
 0.2); across runs the per-task savings land in roughly the 74-93% band, median ~75-86%.
 
+## Checking the task set
+
+```bash
+python bench/check_tasks.py
+```
+
+This validates `tasks.json` (required keys, valid tiers, unique ids, test paths that exist,
+briefs that are long enough) and then runs every task's test against a throwaway copy of
+`fixtures/`. A task is reported `ok` only when its test fails there, which proves the task is
+genuinely unsolved and that no task records a free win. Run it after adding or editing a task;
+it exits non-zero if any task is malformed or already satisfied by the pristine fixtures.
+
 ## Latest result
 
 See [RESULTS.md](RESULTS.md). A representative run: median **86% fewer orchestrator tokens**

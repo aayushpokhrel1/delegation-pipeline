@@ -24,6 +24,36 @@
       "tier": "substantial",
       "test": "tests/test_validate.py",
       "brief": "In calc.py, make `add` and `mul` validate their inputs: if either argument is not an int or float (bool counts as non-numeric here is not required; just check int/float), raise TypeError. Keep the existing correct behavior for numeric inputs. Do not modify the test files."
+    },
+    {
+      "id": "extract",
+      "tier": "substantial",
+      "test": "tests/test_extract.py",
+      "brief": "report.py and invoice.py each define an identical local helper `format_cents(cents)` that returns a string like \"$3.05\". Create a new file money_fmt.py containing a single `format_cents(cents)` function with exactly that behavior. Then change report.py and invoice.py to import `format_cents` from money_fmt and delete their own local copies of the function. `report.render` and `invoice.line` must keep behaving exactly as before. Do not change any other behavior."
+    },
+    {
+      "id": "median",
+      "tier": "substantial",
+      "test": "tests/test_median.py",
+      "brief": "In stats.py, the `median` function is wrong for even-length inputs: it returns the upper of the two middle values instead of the mean of the two middle values. Fix `median` so that for an even-length list it returns the mean of the two middle values, while keeping the correct behavior for odd-length lists. Also make `median` raise ValueError when given an empty list. Leave `mean` unchanged. Do not modify the test files."
+    },
+    {
+      "id": "annotate",
+      "tier": "mechanical",
+      "test": "tests/test_annotate.py",
+      "brief": "In geometry.py, add type annotations to every parameter and to the return value of every function (area_rect, area_circle, perimeter_rect, scale). Use `float` for all parameters and all return values. Do not change any behavior."
+    },
+    {
+      "id": "rename",
+      "tier": "mechanical",
+      "test": "tests/test_rename.py",
+      "brief": "Rename the function `f_to_c` to `fahrenheit_to_celsius` everywhere. Update the definition in temp_convert.py and every call site, including the call inside temp_convert.freezing_c and the call in weather.describe. Change no other behavior, and leave no alias or wrapper behind under the old name `f_to_c`."
+    },
+    {
+      "id": "duration",
+      "tier": "substantial",
+      "test": "tests/test_duration.py",
+      "brief": "Create a new file duration.py with a function `parse_duration(text)` that converts a compact duration string into a whole number of seconds. Support the units `h`, `m` and `s` in any combination and in that order, for example \"1h30m\" is 5400, \"45s\" is 45, \"2h\" is 7200 and \"1h2m3s\" is 3723. Return an int. Tolerate surrounding whitespace. Raise ValueError for an empty string, for text with no unit such as \"10\", for an unknown unit such as \"5d\", and for garbage such as \"abc\"."
     }
   ]
 }
