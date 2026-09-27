@@ -7,3 +7,7 @@ __pycache__/
 
 # graphify generated knowledge graph (local artifact)
 graphify-out/
+
+# Orchestration scratch (briefs handed to workers, diffs handed to reviewers).
+brief*.md
+review*.diff
