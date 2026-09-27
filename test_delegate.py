@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Framework-free checks for delegate.py's pure helpers (no network). Run: python test_delegate.py"""
 import base64
+import json
 import os
 import sys
 import tempfile
@@ -79,6 +80,67 @@ def test_agent_loop_survives_empty_tool_result():
     delegate.chat_completion = lambda *a, **k: replies.pop(0)
     summary, _ = delegate.agent_loop("free", "read it", 5, 30)
     assert summary == "done", summary
+
+
+def test_summarize_ledger_totals():
+    rows = [
+        {"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "alpha", "prompt": 100, "completion": 50, "total": 150, "calls": 2,
+         "verify": "failed", "commit": "abc1234"},
+        {"ts": "2026-09-15T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "alpha", "prompt": 200, "completion": 100, "total": 300, "calls": 3,
+         "verify": "passed", "commit": "skipped"},
+        {"ts": "2026-09-27T10:00:00Z", "backend": "free", "repo": "beta",
+         "prompt": 400, "completion": 200, "total": 600, "calls": 4,
+         "verify": None, "commit": None},
+    ]
+    s = delegate.summarize_ledger(rows)
+    assert s["runs"] == 3
+    assert s["total"] == 1050
+    assert s["prompt"] == 700
+    assert s["completion"] == 350
+    assert s["calls"] == 9
+    assert s["first"] == "2026-09-01T10:00:00Z"
+    assert s["last"] == "2026-09-27T10:00:00Z"
+    assert s["verify_failed"] == 1
+    assert s["commits"] == 1
+    assert s["by_backend"]["deepseek"] == {"runs": 1, "total": 150}
+    assert s["by_backend"]["free"] == {"runs": 2, "total": 900}
+    assert s["by_repo"]["alpha"] == {"runs": 2, "total": 450}
+    assert s["by_repo"]["beta"] == {"runs": 1, "total": 600}
+    assert s["by_month"]["2026-09"] == {"runs": 3, "total": 1050}
+    assert s["by_model"]["unknown"] == {"runs": 1, "total": 600}
+    assert s["by_model"]["deepseek-chat"] == {"runs": 1, "total": 150}
+    assert s["by_model"]["auto/coding"] == {"runs": 1, "total": 300}
+    assert s["avoided"] == round(1050 * (1 - delegate.REVIEW_RATIO))
+    assert s["worker_usd"] == 150 / 1e6 * delegate.WORKER_PRICE_PER_MTOK["deepseek"]
+
+
+def test_summarize_ledger_empty():
+    s = delegate.summarize_ledger([])
+    assert s["runs"] == 0
+    assert s["total"] == 0
+    assert s["first"] is None
+    assert s["last"] is None
+
+
+def test_record_run_roundtrip():
+    original = delegate.LEDGER_PATH
+    try:
+        d = tempfile.mkdtemp()
+        delegate.LEDGER_PATH = os.path.join(d, "sub", "usage.jsonl")
+        e1 = {"ts": "2026-09-01T10:00:00Z", "backend": "free", "total": 10}
+        e2 = {"ts": "2026-09-02T10:00:00Z", "backend": "deepseek", "total": 20}
+        assert delegate.record_run(e1) is True
+        assert delegate.record_run(e2) is True
+        with open(delegate.LEDGER_PATH, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        assert len(lines) == 2, lines
+        assert json.loads(lines[0]) == e1
+        assert json.loads(lines[1]) == e2
+    finally:
+        delegate.LEDGER_PATH = original
+
 
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):

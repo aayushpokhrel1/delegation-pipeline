@@ -95,6 +95,20 @@ CONFIG_PATH = os.path.join(
     os.path.expanduser("~"), ".claude", "delegate.config.json"
 )
 
+LEDGER_PATH = os.environ.get("DELEGATE_LEDGER") or os.path.join(
+    os.path.expanduser("~"), ".claude", "delegate-usage.jsonl"
+)
+# Median T_review / T_do from bench/RESULTS.md: reviewing a worker's diff costs
+# about 13.9% of what doing the task inline costs, so ~86.1% of an offloaded
+# task's tokens never reach the Claude subscription.
+REVIEW_RATIO = 0.139
+# Rough blended USD per 1M tokens actually paid on each worker tier.
+# Backends not listed here are free tiers ($0).
+WORKER_PRICE_PER_MTOK = {"deepseek": 0.28, "kimi": 2.0}
+# Blended USD per 1M tokens for an Opus-class orchestrator, used only for the
+# "equivalent value" line in --stats.
+CLAUDE_PRICE_PER_MTOK = 15.0
+
 # Files / dirs the worker should never wander into.
 IGNORE_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__",
                "dist", "build", ".next", ".mypy_cache", ".pytest_cache"}
@@ -155,6 +169,124 @@ def log(msg):
 def die(msg, code=1):
     print(f"delegate: error: {msg}", file=sys.stderr, flush=True)
     sys.exit(code)
+
+
+def record_run(entry):
+    """Append one run to the JSONL ledger at LEDGER_PATH. Telemetry must never
+    break a delegation, so every filesystem error is swallowed."""
+    try:
+        os.makedirs(os.path.dirname(LEDGER_PATH) or ".", exist_ok=True)
+        with open(LEDGER_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def summarize_ledger(rows):
+    """Aggregate ledger rows into the totals --stats prints. Pure: takes a list
+    of dicts, returns a dict, touches no files."""
+    prompt = completion = total = calls = 0
+    worker_usd = 0.0
+    verify_failed = 0
+    commits = 0
+    timestamps = []
+    by_backend = {}
+    by_model = {}
+    by_repo = {}
+    by_month = {}
+
+    def _bump(group, key, row_total):
+        slot = group.setdefault(key, {"runs": 0, "total": 0})
+        slot["runs"] += 1
+        slot["total"] += row_total
+
+    for row in rows:
+        row_prompt = row.get("prompt", 0) or 0
+        row_completion = row.get("completion", 0) or 0
+        row_total = row.get("total", 0) or 0
+        prompt += row_prompt
+        completion += row_completion
+        total += row_total
+        calls += row.get("calls", 0) or 0
+        backend = row.get("backend") or "unknown"
+        worker_usd += row_total / 1e6 * WORKER_PRICE_PER_MTOK.get(backend, 0.0)
+        ts = row.get("ts")
+        if ts:
+            timestamps.append(ts)
+        _bump(by_backend, backend, row_total)
+        _bump(by_model, row.get("model") or "unknown", row_total)
+        _bump(by_repo, row.get("repo") or "unknown", row_total)
+        _bump(by_month, (ts or "unknown")[:7], row_total)
+        if row.get("verify") == "failed":
+            verify_failed += 1
+        commit = row.get("commit")
+        if isinstance(commit, str) and commit and commit != "skipped":
+            commits += 1
+
+    avoided = round(total * (1 - REVIEW_RATIO))
+    return {
+        "runs": len(rows),
+        "prompt": prompt,
+        "completion": completion,
+        "total": total,
+        "calls": calls,
+        "first": min(timestamps) if timestamps else None,
+        "last": max(timestamps) if timestamps else None,
+        "worker_usd": worker_usd,
+        "avoided": avoided,
+        "avoided_usd": avoided / 1e6 * CLAUDE_PRICE_PER_MTOK,
+        "by_backend": by_backend,
+        "by_model": by_model,
+        "by_repo": by_repo,
+        "by_month": by_month,
+        "verify_failed": verify_failed,
+        "commits": commits,
+    }
+
+
+def print_stats():
+    """Read the ledger and print the running savings tally to stdout."""
+    rows = []
+    try:
+        with open(LEDGER_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        rows = []
+
+    if not rows:
+        print(f"delegate usage ledger is empty (no runs recorded yet): {LEDGER_PATH}")
+        return
+
+    s = summarize_ledger(rows)
+    pct = round((1 - REVIEW_RATIO) * 100, 1)
+    print(f"delegate usage ledger: {LEDGER_PATH}")
+    print(f"{s['runs']} runs from {s['first']} to {s['last']}")
+    print()
+    print(f"offloaded to workers   {format(s['total'], ',')} tokens over "
+          f"{format(s['calls'], ',')} worker calls   (measured)")
+    print(f"paid on worker tier    ${s['worker_usd']:.2f}")
+    print(f"claude tokens avoided  ~{format(s['avoided'], ',')}   "
+          f"({pct}% of offloaded, ratio from bench/RESULTS.md)")
+    print(f"opus-equivalent value  ~${s['avoided_usd']:.2f}")
+    print(f"verify failures {s['verify_failed']}   commits {s['commits']}")
+    print()
+
+    for label, group in (("backend", s["by_backend"]), ("model", s["by_model"]),
+                         ("repo", s["by_repo"]), ("month", s["by_month"])):
+        print(f"by {label}:")
+        width = max([len(k) for k in group] + [0])
+        for key, slot in sorted(group.items(), key=lambda kv: -kv[1]["total"]):
+            print(f"  {key.ljust(width)}   {format(slot['runs'], ',')} runs   "
+                  f"{format(slot['total'], ',')} tokens")
+        print()
 
 
 # --------------------------------------------------------------------------- #
@@ -734,7 +866,8 @@ def main():
         prog="delegate",
         description="Run a headless cheap-model worker over the current repo.",
     )
-    parser.add_argument("backend", help="Backend name (free, nvidia, deepseek, kimi, ...)")
+    parser.add_argument("backend", nargs="?", default=None,
+                        help="Backend name (free, nvidia, deepseek, kimi, ...)")
     parser.add_argument("task", nargs="?", default=None,
                         help="The task instruction for the worker")
     parser.add_argument("--dir", default=None, help="Repo root (default: cwd)")
@@ -745,6 +878,9 @@ def main():
     parser.add_argument("--max-steps", type=int, default=None, help="Max agent steps")
     parser.add_argument("--list-models", action="store_true",
                         help="List the models this backend exposes, then exit")
+    parser.add_argument("--stats", action="store_true",
+                        help="Print the running token-savings tally from the "
+                             "usage ledger, then exit")
     parser.add_argument("--verify", default=None,
                         help="Command to run after editing (e.g. 'npm test'). "
                              "A non-zero exit prints the output and skips the commit.")
@@ -752,6 +888,12 @@ def main():
                         help="On success (verify passed, or no --verify) git add -A "
                              "and commit with this message.")
     args = parser.parse_args()
+
+    if args.stats:
+        print_stats()
+        return
+    if not args.backend:
+        parser.error("backend is required")
 
     global ROOT
     if args.dir:
@@ -784,6 +926,7 @@ def main():
 
     log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}"
         + (f" images={len(image_uris)}" if image_uris else ""))
+    started = time.monotonic()
     summary, usage = agent_loop(backend, args.task, max_steps, timeout, image_uris)
 
     # Worker tokens ran on the free/cheap backend, not the Claude subscription.
@@ -799,13 +942,29 @@ def main():
     else:
         summary += "\nTOKENS: unavailable (backend returned no usage)"
 
+    entry = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "backend": args.backend,
+        "model": backend["model"],
+        "repo": os.path.basename(ROOT) or ROOT,
+        "prompt": usage["prompt_tokens"],
+        "completion": usage["completion_tokens"],
+        "total": usage["total_tokens"],
+        "calls": usage["calls"],
+        "elapsed_s": round(time.monotonic() - started, 1),
+        "verify": None,
+        "commit": None,
+    }
+
     verify_ok = True
     if args.verify:
         log(f"delegate: verify: {args.verify}")
         verify_ok, out = run_verify(args.verify, timeout)
         tail = "\n".join(out.splitlines()[-40:])
         log(f"delegate: verify {'PASSED' if verify_ok else 'FAILED'}")
+        entry["verify"] = "passed" if verify_ok else "failed"
         if not verify_ok:
+            record_run(entry)
             print(summary)
             print(f"\n--- VERIFY FAILED: {args.verify} ---")
             print(tail)
@@ -815,9 +974,11 @@ def main():
     if args.commit and verify_ok:
         ok, info = git_commit(args.commit)
         log(f"delegate: commit {'ok ' + info if ok else 'skipped: ' + info}")
+        entry["commit"] = info if ok else "skipped"
         summary += (f"\n--- COMMITTED {info} ---" if ok
                     else f"\n--- COMMIT SKIPPED: {info} ---")
 
+    record_run(entry)
     print(summary)
 
 

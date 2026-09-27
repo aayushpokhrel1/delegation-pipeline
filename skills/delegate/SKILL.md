@@ -50,6 +50,10 @@ For an image task (a mockup, screenshot, diagram), pass `--image <path|url>` wit
 vision-capable model (e.g. `openrouter --model inclusionai/ling-3.0-flash-vl:free`); the
 worker can also fetch images itself mid-task via its `view_image` tool.
 
+Every run is tallied in a persistent ledger (`~/.claude/delegate-usage.jsonl`, override with
+`DELEGATE_LEDGER`), and `delegate --stats` reports the running savings: offloaded tokens,
+worker cost, and the estimated Claude tokens avoided.
+
 ## Protocol per delegated task
 
 1. Write a tight, self-contained instruction: name the files, describe the change, point at

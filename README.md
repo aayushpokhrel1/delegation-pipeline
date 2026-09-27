@@ -253,7 +253,31 @@ Step logs stream to **stderr**; the final **summary** prints to **stdout**.
 Flags: `--dir <path>` (repo root, default cwd), `--model <id>` (override),
 `--image <path|url>` (attach an image, repeatable, needs a vision model; the worker can also
 fetch images mid-task via its `view_image` tool), `--max-steps N`, `--list-models` (print the
-backend's catalog and exit), plus `--verify` / `--commit` (below).
+backend's catalog and exit), `--stats` (print the running savings tally and exit), plus
+`--verify` / `--commit` (below).
+
+### The usage ledger
+
+Every `delegate` run appends one line to `~/.claude/delegate-usage.jsonl` (override the path
+with the `DELEGATE_LEDGER` env var). The ledger accumulates across all sessions and all repos,
+so it is a running record of everything you have offloaded, not just the current run.
+
+```bash
+~/.claude/bin/delegate --stats
+```
+
+`--stats` reads the ledger back and prints the tally: total offloaded tokens and worker calls,
+what you paid on the worker tier, the Claude tokens avoided, an Opus-equivalent value, verify
+failures and commits, plus breakdowns by backend, model, repo, and month.
+
+The offloaded-token count is **measured** from the backend's own `usage` fields. The "claude
+tokens avoided" figure is an **estimate**: it applies the median review ratio from
+[`bench/RESULTS.md`](bench/RESULTS.md) (reviewing a worker's diff costs about 13.9% of doing
+the task inline, so roughly 86.1% of the offloaded tokens never reach your subscription). The
+dollar figures are rough blended per-tier prices, useful for a sense of scale, not billing.
+
+The file is plain JSONL, one run per line, so it can be grepped, piped into `jq`, or deleted
+freely. Deleting it just resets the tally; nothing else depends on it.
 
 ### Letting Claude pick the model
 
