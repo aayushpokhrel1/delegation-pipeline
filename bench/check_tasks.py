@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
 """
-check_tasks.py - prove every benchmark task is well-formed and genuinely unsolved.
+check_tasks.py - prove every benchmark task is well-formed and genuinely solvable.
 
 The benchmark only means something if each task's pytest gate fails on the pristine
-fixtures and passes only after the task's brief has been carried out. A test that
-already passes would record a free win and silently inflate the published savings.
+fixtures and passes once the task's brief has been carried out. A test that already
+passes would record a free win and silently inflate the published savings, and a test
+that can never pass (or that fails for an unrelated reason such as a typo in an
+import) would make the task unsolvable.
 
 This script validates bench/tasks.json (required keys, tiers, unique ids, existing
-test paths, non-trivial briefs) and then runs every task's test against a throwaway
-copy of bench/fixtures/. A task is ok only when pytest exits NON-ZERO there, which
-means the test currently fails and the task is really unsolved.
+test paths, non-trivial briefs, a reference solution directory per task) and then
+runs every task's test twice against throwaway copies of bench/fixtures/:
+
+  1. unsolved: on the pristine copy, pytest must exit NON-ZERO, which means the test
+     currently fails and the task is really unsolved.
+  2. solvable: with the committed reference solution from bench/solutions/<id> copied
+     over a second pristine copy, pytest must exit ZERO, which means the task can be
+     solved and the gate is not broken.
+
+A task is ok only when both phases pass. The script also refuses to run when a
+directory named 'solutions' exists anywhere under bench/fixtures/, because that would
+hand the model under test the answers.
 
 Usage:
     python bench/check_tasks.py
 
-Exit code 0 when every check passed, 1 otherwise. bench/fixtures/ is never modified,
-only the temp copy.
+Exit code 0 when every task completed both phases, 1 otherwise. bench/fixtures/ is
+never modified, only the temp copies.
 """
 
 import json
@@ -27,6 +38,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "fixtures")
+SOLUTIONS = os.path.join(HERE, "solutions")
 TASKS = os.path.join(HERE, "tasks.json")
 
 REQUIRED_KEYS = ("id", "tier", "test", "brief")
@@ -73,6 +85,19 @@ def check_task(task, index, seen_ids):
     if len(task["brief"]) < MIN_BRIEF:
         return (f"task '{task['id']}' brief is only {len(task['brief'])} characters, "
                 f"a brief must be at least {MIN_BRIEF}")
+    solution = os.path.join(SOLUTIONS, task["id"])
+    if not os.path.isdir(solution) or not any(
+            os.path.isfile(os.path.join(root, name))
+            for root, _, names in os.walk(solution) for name in names):
+        return f"no reference solution in bench/solutions/{task['id']}"
+    return None
+
+
+def find_leaked_solutions(root):
+    """Return the first 'solutions' directory found under root, or None."""
+    for dirpath, dirnames, _ in os.walk(root):
+        if "solutions" in dirnames:
+            return os.path.join(dirpath, "solutions")
     return None
 
 
@@ -87,6 +112,27 @@ def run_test(copy, test):
         [sys.executable, "-m", "pytest", "-q", test],
         cwd=copy, capture_output=True, text=True)
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
+def fresh_copy():
+    """Return a new temp copy of FIXTURES. The caller must remove it."""
+    copy = tempfile.mkdtemp(prefix="check_tasks_")
+    shutil.copytree(FIXTURES, copy, dirs_exist_ok=True)
+    return copy
+
+
+def apply_solution(copy, task_id):
+    """Copy every file of SOLUTIONS/<task_id> over copy, preserving paths."""
+    source = os.path.join(SOLUTIONS, task_id)
+    for root, _, names in os.walk(source):
+        for name in names:
+            src = os.path.join(root, name)
+            rel = os.path.relpath(src, source)
+            dst = os.path.join(copy, rel)
+            parent = os.path.dirname(dst)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            shutil.copy2(src, dst)
 
 
 def main():
@@ -108,26 +154,51 @@ def main():
             failures += 1
 
     if failures:
-        print(f"summary: {len(tasks) - failures} ok, {failures} failed")
+        print(f"summary: 0 ok, {failures} failed, {len(tasks) - failures} unchecked")
         return 1
 
-    copy = tempfile.mkdtemp(prefix="check_tasks_")
-    try:
-        shutil.copytree(FIXTURES, copy, dirs_exist_ok=True)
-        for task in tasks:
-            code, output = run_test(copy, task["test"])
-            if code == 0:
-                print(f"FAIL {task['id']}: test already satisfied by the fixtures, "
-                      f"so it would record a free win")
-                print(tail(output))
-                failures += 1
-            else:
-                print(f"ok {task['id']}")
-    finally:
-        shutil.rmtree(copy, ignore_errors=True)
+    leak = find_leaked_solutions(FIXTURES)
+    if leak:
+        print(f"FAIL fixtures: {leak} leaks the reference solutions into the fixtures "
+              f"tree, which run_bench.py copies to the model under test")
+        print(f"summary: 0 ok, 1 failed, {len(tasks)} unchecked")
+        return 1
 
-    print(f"summary: {len(tasks) - failures} ok, {failures} failed")
-    return 1 if failures else 0
+    ok = 0
+    for task in tasks:
+        task_id = task["id"]
+        unsolved = fresh_copy()
+        try:
+            code, output = run_test(unsolved, task["test"])
+        finally:
+            shutil.rmtree(unsolved, ignore_errors=True)
+        if code == 0:
+            print(f"FAIL {task_id}: test already satisfied by the fixtures, "
+                  f"so it would record a free win")
+            print(tail(output))
+            failures += 1
+            continue
+
+        solvable = fresh_copy()
+        try:
+            apply_solution(solvable, task_id)
+            code, output = run_test(solvable, task["test"])
+        finally:
+            shutil.rmtree(solvable, ignore_errors=True)
+        if code != 0:
+            print(f"FAIL {task_id}: the reference solution in bench/solutions/{task_id} "
+                  f"does not satisfy the gate, so the task is unsolvable or the gate "
+                  f"is broken")
+            print(tail(output))
+            failures += 1
+            continue
+
+        print(f"ok {task_id}")
+        ok += 1
+
+    unchecked = len(tasks) - ok - failures
+    print(f"summary: {ok} ok, {failures} failed, {unchecked} unchecked")
+    return 1 if failures or unchecked else 0
 
 
 if __name__ == "__main__":

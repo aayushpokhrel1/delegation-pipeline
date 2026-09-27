@@ -53,10 +53,17 @@ python bench/check_tasks.py
 ```
 
 This validates `tasks.json` (required keys, valid tiers, unique ids, test paths that exist,
-briefs that are long enough) and then runs every task's test against a throwaway copy of
-`fixtures/`. A task is reported `ok` only when its test fails there, which proves the task is
-genuinely unsolved and that no task records a free win. Run it after adding or editing a task;
-it exits non-zero if any task is malformed or already satisfied by the pristine fixtures.
+briefs that are long enough, a reference solution directory per task) and then runs every task's
+test twice against throwaway copies of `fixtures/`. First it proves the gate fails on the
+pristine fixtures, so no task records a free win. Then it copies the reference solution from
+`bench/solutions/<id>` over a second pristine copy and proves the gate passes, so no task is
+unsolvable and no gate is broken. A task is reported `ok` only when both phases pass. Run it
+after adding or editing a task; it exits non-zero if any task is malformed, already satisfied by
+the pristine fixtures, or not satisfied by its reference solution.
+
+The reference solutions live outside `bench/fixtures/` on purpose, because `run_bench.py` copies
+the whole fixtures tree into the directory the model under test works in, so a solution placed
+inside it would leak the answer.
 
 ## Latest result
 
