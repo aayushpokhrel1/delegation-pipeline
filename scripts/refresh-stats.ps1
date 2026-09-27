@@ -25,16 +25,18 @@ try {
         exit 1
     }
 
-    # Only README.md matters here; unrelated work in the tree must stay untouched.
-    $status = & git status --porcelain -- README.md
+    # README.md and the published ledger snapshot are one unit: the block and the
+    # snapshot are refreshed by the same run, so they are staged and committed
+    # together. Unrelated work in the tree must stay untouched.
+    $status = & git status --porcelain -- README.md bench/ledger-snapshot.jsonl
     if (-not $status) {
         Write-Log "README unchanged, nothing to commit"
         exit 0
     }
 
-    & git add -- README.md
+    & git add -- README.md bench/ledger-snapshot.jsonl
     if ($LASTEXITCODE -ne 0) {
-        Write-Log "git add -- README.md failed"
+        Write-Log "git add -- README.md bench/ledger-snapshot.jsonl failed"
         exit 1
     }
     & git commit -m "chore: refresh delegation stats" | Out-Null
@@ -43,7 +45,7 @@ try {
         exit 1
     }
     $sha = (& git rev-parse --short HEAD).Trim()
-    Write-Log "committed README.md as $sha"
+    Write-Log "committed README.md and bench/ledger-snapshot.jsonl as $sha"
 } catch {
     Write-Log "error: $($_.Exception.Message)"
     exit 1

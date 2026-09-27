@@ -198,6 +198,117 @@ def test_bar_clamps():
     assert delegate._bar(None) == delegate._bar(0)
 
 
+def test_write_snapshot_strips_repo_names():
+    d = tempfile.mkdtemp()
+    os.mkdir(os.path.join(d, "bench"))
+    path = os.path.join(d, "bench", "ledger-snapshot.jsonl")
+    rows = [
+        {"ts": "2026-09-15T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "private-repo-two", "prompt": 200, "completion": 100, "total": 300,
+         "calls": 3},
+        {"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "private-repo-one", "prompt": 100, "completion": 50, "total": 150,
+         "calls": 2},
+        {"ts": "2026-09-27T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "private-repo-three", "prompt": 400, "completion": 200, "total": 600,
+         "calls": 4},
+    ]
+    count = delegate.write_snapshot(rows, path)
+    assert count == 3, count
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    lines = text.splitlines()
+    assert len(lines) == 3, lines
+    for name in ("private-repo-one", "private-repo-two", "private-repo-three"):
+        assert name not in text, name
+    parsed = [json.loads(line) for line in lines]
+    for row in parsed:
+        assert "repo" not in row, row
+    # Every other field survives unchanged.
+    by_ts = {row["ts"]: row for row in parsed}
+    for original in rows:
+        expected = {k: v for k, v in original.items() if k != "repo"}
+        assert by_ts[original["ts"]] == expected, original
+    # Oldest ts first, even though the rows were passed out of order.
+    assert [row["ts"] for row in parsed] == [
+        "2026-09-01T10:00:00Z", "2026-09-15T10:00:00Z", "2026-09-27T10:00:00Z"]
+
+
+def test_write_snapshot_skips_missing_dir():
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "no-such-dir", "ledger-snapshot.jsonl")
+    rows = [{"ts": "2026-09-01T10:00:00Z", "backend": "free", "total": 10}]
+    assert delegate.write_snapshot(rows, path) is None
+    assert not os.path.exists(path)
+    assert not os.path.exists(os.path.dirname(path))
+
+
+def test_snapshot_roundtrips_through_summarize():
+    d = tempfile.mkdtemp()
+    os.mkdir(os.path.join(d, "bench"))
+    path = os.path.join(d, "bench", "ledger-snapshot.jsonl")
+    rows = [
+        {"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "alpha", "prompt": 100, "completion": 50, "total": 150, "calls": 2},
+        {"ts": "2026-09-15T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "beta", "prompt": 200, "completion": 100, "total": 300, "calls": 3},
+    ]
+    assert delegate.write_snapshot(rows, path) == 2
+    with open(path, "r", encoding="utf-8") as f:
+        written_rows = [json.loads(line) for line in f if line.strip()]
+    assert (delegate.summarize_ledger(written_rows)["total"]
+            == delegate.summarize_ledger(rows)["total"])
+    assert list(delegate.summarize_ledger(written_rows)["by_repo"]) == ["unknown"]
+
+
+def test_stats_markdown_publishes_range():
+    rows = [
+        {"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "alpha", "prompt": 100, "completion": 50, "total": 150, "calls": 2},
+    ]
+    md = delegate.stats_markdown(delegate.summarize_ledger(rows))
+    assert str(delegate.BENCH_SAVINGS_MIN) in md, md
+    assert str(delegate.BENCH_SAVINGS_MAX) in md, md
+    assert str(delegate.BENCH_TASK_COUNT) in md, md
+    assert "bench/ledger-snapshot.jsonl" in md, md
+    assert "python delegate.py --stats --ledger bench/ledger-snapshot.jsonl" in md, md
+
+
+def test_bench_constants_match_results_file():
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "bench", "RESULTS.md")
+    with open(path, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    savings = []
+    medians_savings = None
+    for line in lines:
+        if line.startswith("Medians:"):
+            for token in line.split():
+                if token.startswith("savings="):
+                    medians_savings = float(token.split("=", 1)[1].rstrip("%"))
+        # A task row is: | id | tier | inline ok | worker ok | T_do | T_review | savings | T_worker |
+        # Strip the empty edges a Markdown row leaves behind before indexing.
+        fields = [f.strip() for f in line.strip().strip("|").split("|")]
+        if len(fields) != 8 or not fields[4].isdigit():
+            continue  # header, separator, or prose
+        savings.append(float(fields[6]))
+
+    assert len(savings) == delegate.BENCH_TASK_COUNT, (
+        f"bench/RESULTS.md has {len(savings)} task rows but BENCH_TASK_COUNT is "
+        f"{delegate.BENCH_TASK_COUNT}; update BENCH_TASK_COUNT in delegate.py")
+    assert min(savings) == delegate.BENCH_SAVINGS_MIN, (
+        f"bench/RESULTS.md minimum savings is {min(savings)} but BENCH_SAVINGS_MIN is "
+        f"{delegate.BENCH_SAVINGS_MIN}; update BENCH_SAVINGS_MIN in delegate.py")
+    assert max(savings) == delegate.BENCH_SAVINGS_MAX, (
+        f"bench/RESULTS.md maximum savings is {max(savings)} but BENCH_SAVINGS_MAX is "
+        f"{delegate.BENCH_SAVINGS_MAX}; update BENCH_SAVINGS_MAX in delegate.py")
+    expected_median = round((1 - delegate.REVIEW_RATIO) * 100, 1)
+    assert medians_savings == expected_median, (
+        f"bench/RESULTS.md Medians savings is {medians_savings} but REVIEW_RATIO gives "
+        f"{expected_median}; update REVIEW_RATIO in delegate.py")
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

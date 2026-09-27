@@ -102,6 +102,17 @@ LEDGER_PATH = os.environ.get("DELEGATE_LEDGER") or os.path.join(
 # about 13.9% of what doing the task inline costs, so ~86.1% of an offloaded
 # task's tokens never reach the Claude subscription.
 REVIEW_RATIO = 0.139
+# Spread of the per-task savings in bench/RESULTS.md, published alongside the
+# median so the headline figure is not mistaken for a precise one. A test
+# asserts these still match that file, so re-running the benchmark and
+# forgetting to update them turns the suite red.
+BENCH_SAVINGS_MIN = 74.5
+BENCH_SAVINGS_MAX = 92.6
+BENCH_TASK_COUNT = 4
+# A redacted copy of the ledger, committed so the published numbers can be
+# recomputed by anyone. Repo names are private and never included.
+SNAPSHOT_PATH = os.path.join("bench", "ledger-snapshot.jsonl")
+SNAPSHOT_DROP_FIELDS = ("repo",)
 # Rough blended USD per 1M tokens actually paid on each worker tier.
 # Backends not listed here are free tiers ($0).
 WORKER_PRICE_PER_MTOK = {"deepseek": 0.28, "kimi": 2.0}
@@ -264,6 +275,26 @@ def read_ledger():
     return rows
 
 
+def write_snapshot(rows, path=SNAPSHOT_PATH):
+    """Write a redacted copy of the ledger for publication: every row minus the
+    fields in SNAPSHOT_DROP_FIELDS, oldest first. Returns the number of rows
+    written, or None when the destination directory does not exist (the tool
+    runs in other repos too, and must not litter them)."""
+    parent = os.path.dirname(path)
+    if parent and not os.path.isdir(parent):
+        return None
+    ordered = sorted(rows, key=lambda row: row.get("ts") or "")
+    try:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            for row in ordered:
+                redacted = {k: v for k, v in row.items()
+                            if k not in SNAPSHOT_DROP_FIELDS}
+                f.write(json.dumps(redacted, sort_keys=True) + "\n")
+    except OSError:
+        return None
+    return len(ordered)
+
+
 def print_stats():
     """Read the ledger and print the running savings tally to stdout."""
     rows = read_ledger()
@@ -363,9 +394,18 @@ def stats_markdown(s):
         "",
         "Offloaded tokens and worker calls are measured from each backend's own usage",
         f'fields. "Claude tokens avoided" is an estimate: {pct}% of the offloaded total,',
-        "using the median review ratio from [`bench/RESULTS.md`](bench/RESULTS.md)",
-        f"(reviewing a worker's diff costs about {review_pct}% of doing the task inline). Dollar",
-        "figures are rough blended per-tier prices, for scale, not billing.",
+        f"the median of {BENCH_TASK_COUNT} benchmark tasks in "
+        "[`bench/RESULTS.md`](bench/RESULTS.md)",
+        f"whose individual savings ranged from {BENCH_SAVINGS_MIN}% to "
+        f"{BENCH_SAVINGS_MAX}%. Reviewing a",
+        f"worker's diff costs about {review_pct}% of doing the task inline. Dollar figures",
+        "are rough blended per-tier prices, for scale, not billing.",
+        "",
+        "Every figure above can be recomputed from the redacted ledger committed at",
+        "[`bench/ledger-snapshot.jsonl`](bench/ledger-snapshot.jsonl), using this exact",
+        "command:",
+        "",
+        "`python delegate.py --stats --ledger bench/ledger-snapshot.jsonl`",
     ]
     return "\n".join(lines)
 
@@ -391,6 +431,12 @@ def write_readme_stats(path="README.md"):
         print(f"delegate usage ledger is empty (no runs recorded yet): {LEDGER_PATH}")
         return
     block = stats_markdown(summarize_ledger(rows))
+    # Refresh the published snapshot before the "already up to date" return, so
+    # the snapshot and the README block can never drift apart.
+    written = write_snapshot(rows)
+    if written is not None:
+        print(f"delegate: wrote {SNAPSHOT_PATH} ({format(written, ',')} rows, "
+              f"repo names stripped)")
     try:
         with open(path, "r", encoding="utf-8", newline="") as f:
             text = f.read()
@@ -1009,6 +1055,9 @@ def main():
     parser.add_argument("--stats", action="store_true",
                         help="Print the running token-savings tally from the "
                              "usage ledger, then exit")
+    parser.add_argument("--ledger", default=None, metavar="PATH",
+                        help="Read the usage ledger from PATH instead of "
+                             "~/.claude/delegate-usage.jsonl")
     parser.add_argument("--readme", action="store_true",
                         help="With --stats: refresh the generated stats block in "
                              "README.md instead of printing to the terminal")
@@ -1020,6 +1069,10 @@ def main():
                              "and commit with this message.")
     args = parser.parse_args()
 
+    global ROOT, LEDGER_PATH
+    if args.ledger:
+        LEDGER_PATH = args.ledger
+
     if args.stats:
         if args.readme:
             write_readme_stats()
@@ -1029,7 +1082,6 @@ def main():
     if not args.backend:
         parser.error("backend is required")
 
-    global ROOT
     if args.dir:
         ROOT = os.path.realpath(args.dir)
         if not os.path.isdir(ROOT):

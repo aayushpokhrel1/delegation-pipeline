@@ -26,34 +26,41 @@ orchestrator) review the resulting `git diff` and commit.
 
 ### Measured impact
 
-_Generated 2026-09-27 from 2 delegated runs across 1 repo._
+_Generated 2026-09-27 from 3 delegated runs across 1 repo._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 2 |
-| Tokens offloaded to workers | 932,100 (measured) |
-| Worker API calls | 33 |
-| Paid on the worker tier | $0.26 |
-| Claude tokens avoided | ~802,538 (estimated) |
-| Opus-equivalent value | ~$12.04 |
+| Runs delegated | 3 |
+| Tokens offloaded to workers | 2,036,674 (measured) |
+| Worker API calls | 61 |
+| Paid on the worker tier | $0.57 |
+| Claude tokens avoided | ~1,753,576 (estimated) |
+| Opus-equivalent value | ~$26.30 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   932,100 tokens
+deepseek  ████████████████████  100%   2,036,674 tokens
 ```
 
 By month:
 
 ```
-2026-09  ████████████████████   932,100 tokens
+2026-09  ████████████████████   2,036,674 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
 fields. "Claude tokens avoided" is an estimate: 86.1% of the offloaded total,
-using the median review ratio from [`bench/RESULTS.md`](bench/RESULTS.md)
-(reviewing a worker's diff costs about 13.9% of doing the task inline). Dollar
-figures are rough blended per-tier prices, for scale, not billing.
+the median of 4 benchmark tasks in [`bench/RESULTS.md`](bench/RESULTS.md)
+whose individual savings ranged from 74.5% to 92.6%. Reviewing a
+worker's diff costs about 13.9% of doing the task inline. Dollar figures
+are rough blended per-tier prices, for scale, not billing.
+
+Every figure above can be recomputed from the redacted ledger committed at
+[`bench/ledger-snapshot.jsonl`](bench/ledger-snapshot.jsonl), using this exact
+command:
+
+`python delegate.py --stats --ledger bench/ledger-snapshot.jsonl`
 
 <!-- delegate-stats:end -->
 
@@ -313,6 +320,15 @@ dollar figures are rough blended per-tier prices, useful for a sense of scale, n
 
 The file is plain JSONL, one run per line, so it can be grepped, piped into `jq`, or deleted
 freely. Deleting it just resets the tally; nothing else depends on it.
+
+[`bench/ledger-snapshot.jsonl`](bench/ledger-snapshot.jsonl) is a committed, redacted copy of
+that ledger: repo names are stripped, every token count is intact. It is refreshed by the same
+`delegate --stats --readme` run that regenerates the block below, so the two cannot drift. That
+means anyone can recompute the published table from the repo alone:
+
+```bash
+python delegate.py --stats --ledger bench/ledger-snapshot.jsonl
+```
 
 `delegate --stats --readme` regenerates the "Measured impact" block at the top of this README
 from the ledger. It never includes repository names, only a count of how many repos are

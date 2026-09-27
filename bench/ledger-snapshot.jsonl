@@ -1,0 +1,3 @@
+{"backend": "deepseek", "calls": 13, "commit": null, "completion": 6909, "elapsed_s": null, "model": "deepseek-chat", "prompt": 309009, "total": 315918, "ts": "2026-09-27T14:45:00Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 20, "commit": null, "completion": 6172, "elapsed_s": 49.6, "model": "deepseek-chat", "prompt": 610010, "total": 616182, "ts": "2026-09-27T15:04:03Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 28, "commit": null, "completion": 8473, "elapsed_s": 78.2, "model": "deepseek-chat", "prompt": 1096101, "total": 1104574, "ts": "2026-09-27T15:24:57Z", "verify": "failed"}
