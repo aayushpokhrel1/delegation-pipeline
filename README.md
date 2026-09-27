@@ -26,34 +26,34 @@ orchestrator) review the resulting `git diff` and commit.
 
 ### Measured impact
 
-_Generated 2026-09-27 from 5 delegated runs across 1 repo._
+_Generated 2026-09-27 from 9 delegated runs across 1 repo._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 5 |
-| Tokens offloaded to workers | 2,859,887 (measured) |
-| Worker API calls | 84 |
-| Paid on the worker tier | $0.80 |
-| Claude tokens avoided | ~2,462,363 (estimated) |
-| Opus-equivalent value | ~$36.94 |
+| Runs delegated | 9 |
+| Tokens offloaded to workers | 3,468,068 (measured) |
+| Worker API calls | 132 |
+| Paid on the worker tier | $0.97 |
+| Claude tokens avoided | ~2,968,666 (estimated) |
+| Opus-equivalent value | ~$44.53 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   2,859,887 tokens
+deepseek  ████████████████████  100%   3,468,068 tokens
 ```
 
 By month:
 
 ```
-2026-09  ████████████████████   2,859,887 tokens
+2026-09  ████████████████████   3,468,068 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
-fields. "Claude tokens avoided" is an estimate: 86.1% of the offloaded total,
-the median of 4 benchmark tasks in [`bench/RESULTS.md`](bench/RESULTS.md)
-whose individual savings ranged from 74.5% to 92.6%. Reviewing a
-worker's diff costs about 13.9% of doing the task inline. Dollar figures
+fields. "Claude tokens avoided" is an estimate: 85.6% of the offloaded total,
+the median of 9 benchmark tasks in [`bench/RESULTS.md`](bench/RESULTS.md)
+whose individual savings ranged from 60.7% to 89.7%. Reviewing a
+worker's diff costs about 14.4% of doing the task inline. Dollar figures
 are rough blended per-tier prices, for scale, not billing.
 
 Every figure above can be recomputed from the redacted ledger committed at

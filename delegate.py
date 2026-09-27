@@ -99,16 +99,16 @@ LEDGER_PATH = os.environ.get("DELEGATE_LEDGER") or os.path.join(
     os.path.expanduser("~"), ".claude", "delegate-usage.jsonl"
 )
 # Median T_review / T_do from bench/RESULTS.md: reviewing a worker's diff costs
-# about 13.9% of what doing the task inline costs, so ~86.1% of an offloaded
+# about 14.4% of what doing the task inline costs, so ~85.6% of an offloaded
 # task's tokens never reach the Claude subscription.
-REVIEW_RATIO = 0.139
+REVIEW_RATIO = 0.144
 # Spread of the per-task savings in bench/RESULTS.md, published alongside the
 # median so the headline figure is not mistaken for a precise one. A test
 # asserts these still match that file, so re-running the benchmark and
 # forgetting to update them turns the suite red.
-BENCH_SAVINGS_MIN = 74.5
-BENCH_SAVINGS_MAX = 92.6
-BENCH_TASK_COUNT = 4
+BENCH_SAVINGS_MIN = 60.7
+BENCH_SAVINGS_MAX = 89.7
+BENCH_TASK_COUNT = 9
 # A redacted copy of the ledger, committed so the published numbers can be
 # recomputed by anyone. Repo names are private and never included.
 SNAPSHOT_PATH = os.path.join("bench", "ledger-snapshot.jsonl")

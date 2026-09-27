@@ -65,7 +65,11 @@ def run_delegate(backend, brief, tmp, verifycmd):
     """Run delegate.py in `tmp` and return (total_tokens, ok, stdout)."""
     cmd = [sys.executable, os.path.join(REPO_ROOT, "delegate.py"),
            backend, brief, "--dir", tmp, "--verify", verifycmd]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # Benchmark runs are measurement, not work delegated on anyone's behalf, so keep
+    # them out of the real usage ledger: a bench run would otherwise add two rows per
+    # task from throwaway temp directories and inflate the published totals.
+    env = dict(os.environ, DELEGATE_LEDGER=os.path.join(tmp, "bench-ledger.jsonl"))
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
     out = (proc.stdout or "") + (proc.stderr or "")
     ok = proc.returncode == 0 and "VERIFY PASSED" in (proc.stdout or "")
     return parse_tokens(proc.stdout), ok, out
