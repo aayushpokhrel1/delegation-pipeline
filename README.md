@@ -26,27 +26,27 @@ orchestrator) review the resulting `git diff` and commit.
 
 ### Measured impact
 
-_Generated 2026-09-27 from 9 delegated runs across 1 repo._
+_Generated 2026-09-28 from 17 delegated runs across 2 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 9 |
-| Tokens offloaded to workers | 3,468,068 (measured) |
-| Worker API calls | 132 |
-| Paid on the worker tier | $0.97 |
-| Claude tokens avoided | ~2,968,666 (estimated) |
-| Opus-equivalent value | ~$44.53 |
+| Runs delegated | 17 |
+| Tokens offloaded to workers | 8,218,510 (measured) |
+| Worker API calls | 288 |
+| Paid on the worker tier | $2.30 |
+| Claude tokens avoided | ~7,035,045 (estimated) |
+| Opus-equivalent value | ~$105.53 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   3,468,068 tokens
+deepseek  ████████████████████  100%   8,218,510 tokens
 ```
 
 By month:
 
 ```
-2026-09  ████████████████████   3,468,068 tokens
+2026-09  ████████████████████   8,218,510 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage

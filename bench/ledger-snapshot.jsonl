@@ -7,3 +7,11 @@
 {"backend": "deepseek", "calls": 15, "commit": null, "completion": 10517, "elapsed_s": 58.5, "model": "deepseek-chat", "prompt": 223070, "total": 233587, "ts": "2026-09-27T15:38:43Z", "verify": null}
 {"backend": "deepseek", "calls": 6, "commit": null, "completion": 584, "elapsed_s": 8.8, "model": "deepseek-chat", "prompt": 63029, "total": 63613, "ts": "2026-09-27T15:39:06Z", "verify": null}
 {"backend": "deepseek", "calls": 14, "commit": "12835c6", "completion": 6666, "elapsed_s": 34.0, "model": "deepseek-chat", "prompt": 151662, "total": 158328, "ts": "2026-09-27T15:40:39Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 7, "commit": null, "completion": 2399, "elapsed_s": 15.1, "model": "deepseek-chat", "prompt": 108003, "total": 110402, "ts": "2026-09-28T01:57:11Z", "verify": null}
+{"backend": "deepseek", "calls": 7, "commit": null, "completion": 2624, "elapsed_s": 16.5, "model": "deepseek-chat", "prompt": 118033, "total": 120657, "ts": "2026-09-28T02:17:43Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 21, "commit": null, "completion": 5945, "elapsed_s": 49.8, "model": "deepseek-chat", "prompt": 760736, "total": 766681, "ts": "2026-09-28T02:23:54Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 17, "commit": null, "completion": 3861, "elapsed_s": 42.4, "model": "deepseek-chat", "prompt": 526218, "total": 530079, "ts": "2026-09-28T02:27:27Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 29, "commit": null, "completion": 8191, "elapsed_s": 105.8, "model": "deepseek-chat", "prompt": 1060356, "total": 1068547, "ts": "2026-09-28T02:33:28Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 13, "commit": null, "completion": 2858, "elapsed_s": 49.5, "model": "deepseek-chat", "prompt": 268605, "total": 271463, "ts": "2026-09-28T02:37:56Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 40, "commit": null, "completion": 3076, "elapsed_s": 71.7, "model": "deepseek-chat", "prompt": 1584293, "total": 1587369, "ts": "2026-09-28T03:57:52Z", "verify": "failed"}
+{"backend": "deepseek", "calls": 22, "commit": null, "completion": 5649, "elapsed_s": 42.1, "model": "deepseek-chat", "prompt": 289595, "total": 295244, "ts": "2026-09-28T14:29:16Z", "verify": "failed"}
