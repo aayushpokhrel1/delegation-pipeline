@@ -134,11 +134,13 @@ def fallback_for(name, cfg, model_override=None):
 
     None when the caller pinned --model (a model id is backend-specific, so carrying
     it to another backend would 404), when no hop is defined, or when the hop is not
-    configured on this machine."""
+    configured on this machine. A hop with no credential on this machine is not
+    offered either."""
     if model_override:
         return None
     nxt = FALLBACK_BACKEND.get(name)
-    if not nxt or nxt == name or nxt not in cfg.get("backends", {}):
+    if (not nxt or nxt == name or nxt not in cfg.get("backends", {})
+            or not backend_has_credential(cfg, nxt)):
         return None
     return nxt
 
@@ -211,6 +213,47 @@ def load_config():
             else:
                 cfg[k] = v
     return cfg
+
+
+def _is_local_backend(b):
+    """True when this backend's base_url points at a local gateway (keyless)."""
+    host = urllib.parse.urlparse(b.get("base_url", "")).hostname or ""
+    return host in ("localhost", "127.0.0.1", "::1", "0.0.0.0")
+
+
+def backend_has_credential(cfg, name):
+    """True when `name` is configured and usable on this machine: a local gateway
+    needs no key, a remote one needs a non-empty api_key or api_key_env value.
+    Never raises and never calls die()."""
+    if name not in cfg["backends"]:
+        return False
+    b = cfg["backends"][name]
+    if _is_local_backend(b):
+        return True
+    env = b.get("api_key_env")
+    return bool(b.get("api_key") or (env and os.environ.get(env)))
+
+
+def cold_start_help(cfg, name):
+    """Guidance to append when `name` is a local backend that nothing is listening
+    on, or "" when there is nothing useful to say."""
+    if name not in cfg["backends"]:
+        return ""
+    b = cfg["backends"][name]
+    if not _is_local_backend(b):
+        return ""
+    return (
+        f"\n\nThe '{name}' backend talks to a local gateway at {b['base_url']}, "
+        f"and nothing is listening there.\n"
+        f"Three ways forward:\n"
+        f"  1. Start the gateway, then run the same command again:\n"
+        f"       npx --yes omniroute\n"
+        f"  2. Use a remote backend instead: set one of DEEPSEEK_API_KEY, "
+        f"OPENROUTER_API_KEY or\n"
+        f"     NVIDIA_API_KEY in your environment, then re-run.\n"
+        f"  3. Point '{name}' at any other OpenAI-compatible endpoint by editing\n"
+        f"     {CONFIG_PATH} (start from config.example.json).\n"
+    )
 
 
 def resolve_backend(cfg, name):
@@ -1257,7 +1300,8 @@ def main():
                 if e.edits:
                     die(f"{used_backend} failed after {e.edits} edit(s), so it was not "
                         f"escalated (the tree is half-edited; review it): {e}")
-                die(f"{used_backend} failed and no fallback is available: {e}")
+                die(f"{used_backend} failed and no fallback is available: {e}"
+                    + cold_start_help(cfg, used_backend))
             log(f"delegate: {used_backend} failed with no edits made, escalating to "
                 f"{nxt}: {e}")
             escalated_from, used_backend = used_backend, nxt

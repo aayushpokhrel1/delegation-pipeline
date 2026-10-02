@@ -344,7 +344,9 @@ def test_resolve_positionals_treats_a_lone_argument_as_the_task():
 
 
 def test_fallback_for_picks_the_configured_hop():
-    cfg = {"backends": {"free": {}, "deepseek": {}}}
+    # The hop needs a usable credential now, or it is not offered at all; see
+    # test_fallback_skips_uncredentialed_hop for the other half of that rule.
+    cfg = {"backends": {"free": {}, "deepseek": {"api_key": "sk-test"}}}
     assert delegate.fallback_for("free", cfg) == "deepseek"
     # No hop defined for a paid tier: it is already the escalation target.
     assert delegate.fallback_for("deepseek", cfg) is None
@@ -521,6 +523,53 @@ def test_ensure_launcher_no_payload_is_noop():
         with tempfile.TemporaryDirectory() as bin_dir:
             assert ensure_launcher.ensure(bin_dir, root) == "kept"
             assert not os.path.exists(os.path.join(bin_dir, "delegate"))
+
+
+def test_backend_has_credential_local_is_keyless():
+    cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+    # A local gateway needs no key, so `free` is usable with nothing set.
+    assert delegate.backend_has_credential(cfg, "free") is True
+
+
+def test_backend_has_credential_remote_needs_key():
+    cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+    _saved = os.environ.pop("DEEPSEEK_API_KEY", None)
+    try:
+        assert delegate.backend_has_credential(cfg, "deepseek") is False
+        os.environ["DEEPSEEK_API_KEY"] = "sk-test"
+        assert delegate.backend_has_credential(cfg, "deepseek") is True
+    finally:
+        os.environ.pop("DEEPSEEK_API_KEY", None)
+        if _saved is not None:
+            os.environ["DEEPSEEK_API_KEY"] = _saved
+
+
+def test_fallback_skips_uncredentialed_hop():
+    cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+    _saved = os.environ.pop("DEEPSEEK_API_KEY", None)
+    try:
+        # No key on this machine: the hop is not offered, so the run dies with the
+        # cold-start guidance instead of demanding a DeepSeek key.
+        assert delegate.fallback_for("free", cfg) is None
+        os.environ["DEEPSEEK_API_KEY"] = "sk-test"
+        assert delegate.fallback_for("free", cfg) == "deepseek"
+    finally:
+        os.environ.pop("DEEPSEEK_API_KEY", None)
+        if _saved is not None:
+            os.environ["DEEPSEEK_API_KEY"] = _saved
+
+
+def test_cold_start_help_mentions_all_three_exits():
+    cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+    help_text = delegate.cold_start_help(cfg, "free")
+    assert "npx --yes omniroute" in help_text, help_text
+    assert "DEEPSEEK_API_KEY" in help_text, help_text
+    assert delegate.CONFIG_PATH in help_text, help_text
+
+
+def test_cold_start_help_empty_for_remote_backend():
+    cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+    assert delegate.cold_start_help(cfg, "deepseek") == ""
 
 
 if __name__ == "__main__":
