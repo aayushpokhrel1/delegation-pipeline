@@ -134,10 +134,19 @@ def measure_task(task, args, baseline_backend, timeout):
         row["t_worker"], row["worker_ok"], _ = run_delegate(
             args.worker, task["brief"], worker_dir, verifycmd)
 
-        diff = build_diff(worker_dir)
-        row["t_review"], err = review_diff(baseline_backend, task["brief"], diff, timeout)
-        if err:
-            row["error"] = err
+        # Only score a task the worker actually finished. A failed worker leaves an
+        # empty diff, an empty diff is cheap to review, and a cheap review scores as
+        # HIGH savings -- so reviewing unconditionally makes the headline go UP as the
+        # worker gets worse. Observed for real: a 2026-10-01 free-backend run recorded
+        # its best savings (90.4%) on a task where the worker produced nothing.
+        if row["worker_ok"]:
+            diff = build_diff(worker_dir)
+            row["t_review"], err = review_diff(
+                baseline_backend, task["brief"], diff, timeout)
+            if err:
+                row["error"] = err
+        else:
+            row["error"] = "worker did not complete; not scored"
     except Exception as e:  # noqa: BLE001 - one bad task must not abort the run
         row["error"] = f"{type(e).__name__}: {e}"
     finally:
@@ -182,11 +191,17 @@ def write_results(path, args, rows, medians, total_worker, stamp):
             "yes" if r["worker_ok"] else "no", r["t_do"], r["t_review"],
             fmt(r["savings"]), r["t_worker"]))
     lines.append("")
+    scored = sum(1 for r in rows if r["savings"] is not None)
+    lines.append("Worker completed {} of {} tasks. Medians cover only those {}: a task "
+                 "the worker failed is left unscored, never counted as a saving."
+                 .format(scored, len(rows), scored))
+    lines.append("")
     lines.append("Medians: T_do={} T_review={} T_worker={} savings={}%".format(
         medians["t_do"], medians["t_review"], medians["t_worker"], medians["savings"]))
     lines.append("")
-    lines.append("Headline: median savings {}% with {} worker tokens offloaded.".format(
-        medians["savings"], total_worker))
+    lines.append("Headline: median savings {}% over {}/{} completed, with {} worker "
+                 "tokens offloaded.".format(
+                     medians["savings"], scored, len(rows), total_worker))
     lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
