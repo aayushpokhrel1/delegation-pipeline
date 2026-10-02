@@ -16,8 +16,8 @@ Usage:
     delegate.py free --verify "npm test" --commit "feat: x" "Implement x per spec"
 
 --verify runs the given command after the worker edits; a non-zero exit prints the
-command output and exits 2 without committing. --commit stages all changes and
-commits, but only when verify passed (or no --verify was set). This lets the
+command output and exits 2 without committing. --commit stages and commits only
+the files the worker edited, but only when verify passed (or no --verify was set). This lets the
 orchestrator hand off a task and get back a tested, committed result at no Claude
 token cost, while the worker model itself still never runs shell or git.
 
@@ -1067,7 +1067,14 @@ Rules:
 """
 
 
-def agent_loop(backend, task, max_steps, timeout, image_uris=None):
+def agent_loop(backend, task, max_steps, timeout, image_uris=None, edited_paths=None):
+    """Run the worker loop and return (summary, usage).
+
+    When `edited_paths` is a set, every path the worker successfully edits is added
+    to it in place (repo-relative, forward slashes). The caller passes the set in
+    rather than reading it from the return value so it still holds the paths when
+    this raises BackendError, which is the whole point of the passed-in set.
+    """
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": build_user_content(
@@ -1131,6 +1138,15 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None):
                     ("no change", "not a file", "old_string", "bad ")
                 ):
                     edits += 1
+                    if edited_paths is not None:
+                        raw_path = args.get("path")
+                        if isinstance(raw_path, str) and raw_path:
+                            try:
+                                resolved = safe_path(raw_path)
+                                edited_paths.add(
+                                    os.path.relpath(resolved, ROOT).replace(os.sep, "/"))
+                            except Exception:  # noqa: BLE001 - telemetry, never fatal
+                                pass
                 log(f"[step {step}] {name}({_brief(args)}) -> {(result.splitlines() or [''])[0][:120]}")
             messages.append({
                 "role": "tool",
@@ -1176,18 +1192,45 @@ def run_verify(cmd, timeout):
     return proc.returncode == 0, out
 
 
-def git_commit(message):
-    """Stage all changes and commit in ROOT. Returns (ok, info) where info is a
-    short sha on success or the reason it was skipped/failed."""
+def git_commit(message, paths):
+    """Stage and commit only `paths` (repo-relative) in ROOT, leaving any other
+    staged or dirty content alone. Returns (ok, info) where info is a short sha on
+    success or the reason it was skipped/failed."""
     try:
-        add = subprocess.run(["git", "add", "-A"], cwd=ROOT,
+        wanted = sorted({p for p in paths if p})
+        if not wanted:
+            return False, "nothing to commit (worker made no committable change)"
+        # git add fails on an ignored path and takes the whole commit down with it,
+        # so drop them first. check-ignore exits 1 when nothing is ignored, which
+        # is success here, not an error.
+        try:
+            # NUL-separated, and bytes rather than text: passing encoding= here puts the
+            # pipe in text mode, so on Windows Python turns every \n into \r\n, git sees
+            # paths with a trailing \r, matches none of them, and every ignored path sails
+            # through into `git add`. The filter fails open and silently. Keep this on -z.
+            check = subprocess.run(
+                ["git", "check-ignore", "-z", "--stdin"], cwd=ROOT,
+                input=b"\0".join(p.encode("utf-8") for p in wanted),
+                capture_output=True)
+            ignored = {p.decode("utf-8", "replace")
+                       for p in (check.stdout or b"").split(b"\0") if p}
+            if ignored:
+                wanted = [p for p in wanted if p not in ignored]
+        except Exception:  # noqa: BLE001 - keep every path if the check cannot run
+            pass
+        if not wanted:
+            return False, "nothing to commit (all edited paths are git-ignored)"
+        add = subprocess.run(["git", "add", "--"] + wanted, cwd=ROOT,
                              capture_output=True, encoding="utf-8", errors="replace")
         if add.returncode != 0:
             return False, (add.stderr or "git add failed").strip()
         # git diff --cached --quiet exits 0 when there is nothing staged.
-        if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
+        if subprocess.run(["git", "diff", "--cached", "--quiet", "--"] + wanted,
+                          cwd=ROOT).returncode == 0:
             return False, "nothing to commit (worker made no committable change)"
-        commit = subprocess.run(["git", "commit", "-m", message], cwd=ROOT,
+        # The trailing pathspec commits only these paths, so unrelated content the
+        # user had already staged stays staged.
+        commit = subprocess.run(["git", "commit", "-m", message, "--"] + wanted, cwd=ROOT,
                                capture_output=True, encoding="utf-8", errors="replace")
         if commit.returncode != 0:
             return False, (commit.stderr or commit.stdout or "git commit failed").strip()
@@ -1287,10 +1330,12 @@ def main():
     # next backend would start from a half-applied change nobody reviewed.
     used_backend, used_cfg = args.backend, backend
     escalated_from = None
+    edited_paths = set()
     while True:
         try:
             summary, usage = agent_loop(
-                used_cfg, args.task, max_steps, timeout, image_uris)
+                used_cfg, args.task, max_steps, timeout, image_uris,
+                edited_paths=edited_paths)
             break
         except BackendError as e:
             nxt = fallback_for(used_backend, cfg, args.model) if not e.edits else None
@@ -1358,7 +1403,7 @@ def main():
         summary += f"\n--- VERIFY PASSED: {args.verify} ---"
 
     if args.commit and verify_ok:
-        ok, info = git_commit(args.commit)
+        ok, info = git_commit(args.commit, edited_paths)
         log(f"delegate: commit {'ok ' + info if ok else 'skipped: ' + info}")
         entry["commit"] = info if ok else "skipped"
         summary += (f"\n--- COMMITTED {info} ---" if ok

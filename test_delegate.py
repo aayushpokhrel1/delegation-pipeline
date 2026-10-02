@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -570,6 +571,114 @@ def test_cold_start_help_mentions_all_three_exits():
 def test_cold_start_help_empty_for_remote_backend():
     cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
     assert delegate.cold_start_help(cfg, "deepseek") == ""
+
+
+def _init_temp_repo(d):
+    """git init `d` with a local identity and signing off, so the tests below can
+    commit on a machine with no global git config."""
+    for cmd in (["git", "init"],
+                ["git", "config", "user.email", "worker@example.com"],
+                ["git", "config", "user.name", "Delegate Test"],
+                ["git", "config", "commit.gpgsign", "false"]):
+        subprocess.run(cmd, cwd=d, capture_output=True, encoding="utf-8",
+                       errors="replace", check=True)
+
+
+def _git(d, *args):
+    return subprocess.run(["git"] + list(args), cwd=d, capture_output=True,
+                          encoding="utf-8", errors="replace")
+
+
+def test_agent_loop_records_edited_paths():
+    """The other half of the commit boundary: git_commit can only stage what the worker
+    touched if agent_loop actually records it. The set is passed in, not returned, so the
+    caller still has the paths when agent_loop raises."""
+    original_root = delegate.ROOT
+    original_chat = delegate.chat_completion
+    try:
+        delegate.ROOT = tempfile.mkdtemp()
+        replies = [
+            {"choices": [{"message": {"content": "", "tool_calls": [
+                {"id": "1", "function": {"name": "write_file",
+                                         "arguments": '{"path": "src/new.py", '
+                                                      '"content": "x = 1\\n"}'}}]}}]},
+            {"choices": [{"message": {"content": "done"}}]},
+        ]
+        delegate.chat_completion = lambda *a, **k: replies.pop(0)
+        edited = set()
+        summary, _ = delegate.agent_loop("free", "write it", 5, 30, edited_paths=edited)
+        assert summary == "done", summary
+        assert edited == {"src/new.py"}, edited
+    finally:
+        delegate.ROOT = original_root
+        delegate.chat_completion = original_chat
+
+
+def test_git_commit_only_stages_the_workers_paths():
+    """The bug this guards: git_commit used `git add -A`, so a task commit swept in
+    the user's unrelated in-progress edits and untracked scratch files."""
+    original_root = delegate.ROOT
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            _init_temp_repo(d)
+            for name in ("worker.txt", "unrelated.txt"):
+                with open(os.path.join(d, name), "w", encoding="utf-8") as f:
+                    f.write("initial\n")
+            assert _git(d, "add", "-A").returncode == 0
+            assert _git(d, "commit", "-m", "initial").returncode == 0
+
+            # Dirty the tree the way a real session does.
+            with open(os.path.join(d, "worker.txt"), "w", encoding="utf-8") as f:
+                f.write("worker change\n")
+            with open(os.path.join(d, "unrelated.txt"), "w", encoding="utf-8") as f:
+                f.write("user work in progress\n")
+            with open(os.path.join(d, "scratch.txt"), "w", encoding="utf-8") as f:
+                f.write("scratch\n")
+            with open(os.path.join(d, "brief3.md"), "w", encoding="utf-8") as f:
+                f.write("scratch brief\n")
+            with open(os.path.join(d, ".gitignore"), "w", encoding="utf-8") as f:
+                f.write("ignored.txt\n")
+            with open(os.path.join(d, "ignored.txt"), "w", encoding="utf-8") as f:
+                f.write("ignored\n")
+
+            delegate.ROOT = d
+            ok, info = delegate.git_commit("worker change", ["worker.txt", "ignored.txt"])
+            assert ok is True, info
+
+            shown = _git(d, "show", "--pretty=format:", "--name-only", "HEAD").stdout
+            assert "worker.txt" in shown, shown
+            assert "unrelated.txt" not in shown, shown
+            assert "scratch.txt" not in shown, shown
+            assert "ignored.txt" not in shown, shown
+
+            # The user's unrelated work survived untouched.
+            status = _git(d, "status", "--porcelain").stdout
+            assert "unrelated.txt" in status, status
+            assert "scratch.txt" in status, status
+        finally:
+            delegate.ROOT = original_root
+
+
+def test_git_commit_with_no_paths_is_a_noop():
+    original_root = delegate.ROOT
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            _init_temp_repo(d)
+            with open(os.path.join(d, "unrelated.txt"), "w", encoding="utf-8") as f:
+                f.write("initial\n")
+            assert _git(d, "add", "-A").returncode == 0
+            assert _git(d, "commit", "-m", "initial").returncode == 0
+            with open(os.path.join(d, "unrelated.txt"), "w", encoding="utf-8") as f:
+                f.write("user work in progress\n")
+
+            delegate.ROOT = d
+            before = _git(d, "rev-parse", "HEAD").stdout.strip()
+            ok, info = delegate.git_commit("nothing", [])
+            assert ok is False, info
+            after = _git(d, "rev-parse", "HEAD").stdout.strip()
+            assert after == before, (before, after)
+        finally:
+            delegate.ROOT = original_root
 
 
 if __name__ == "__main__":

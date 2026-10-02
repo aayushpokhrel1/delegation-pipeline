@@ -571,9 +571,10 @@ work is bulkier than its description, which is why one-liners stay in-session.
 ### The verify/commit flow
 
 `--verify "<cmd>"` runs the command after the worker finishes editing. A non-zero exit prints
-the output and exits 2 without committing. `--commit "<msg>"` stages all changes and commits,
-but only when verify passed (or no `--verify` was given). Together they make a delegated task
-self-contained: the orchestrator hands off a brief and gets back a tested, committed result,
+the output and exits 2 without committing. `--commit "<msg>"` stages and commits only the
+files the worker edited, but only when verify passed (or no `--verify` was given). Together
+they make a delegated task self-contained: the orchestrator hands off a brief and gets back a
+tested, committed result,
 without babysitting the test-and-commit cycle and without spending Claude tokens on it.
 
 ```bash
