@@ -184,8 +184,34 @@ claude plugin marketplace add aayushpokhrel1/delegation-pipeline
 claude plugin install delegation-pipeline
 ```
 
-(Or the interactive `/plugin marketplace add ...` and `/plugin install ...`.) After a repo
-change, `claude plugin update delegation-pipeline` pulls it.
+(Or the interactive `/plugin marketplace add ...` and `/plugin install ...`.)
+
+#### If you develop this repo, point the marketplace at your checkout
+
+A GitHub marketplace pins a commit, so the installed skills can silently lag your working
+copy by weeks, and stale skill prose is live instruction in every session. Use a directory
+marketplace instead:
+
+```
+claude plugin marketplace remove delegation-pipeline
+claude plugin marketplace add /path/to/your/checkout
+claude plugin install delegation-pipeline
+```
+
+Removing a marketplace uninstalls its plugins, so the `install` is required, not optional.
+
+**`claude plugin update` does not refresh a directory marketplace.** It compares the
+version in `.claude-plugin/plugin.json` and reports "already at the latest version
+(0.1.0)" however much the files changed. To pick up an edit, either bump that version or:
+
+```
+claude plugin uninstall delegation-pipeline && claude plugin install delegation-pipeline
+```
+
+Install copies your working tree, **not** `HEAD`: uncommitted edits and even gitignored
+paths (`__pycache__/`, `graphify-out/`) land in the installed copy. Convenient while
+iterating, but it means a half-finished `SKILL.md` becomes live guidance, so finish an edit
+before reinstalling.
 
 **Two pieces, by design:** the plugin carries the Claude-facing commands + skills; `install.sh`
 / `install.ps1` carry the machine-side worker binary (`~/.claude/bin/delegate`) and config,
