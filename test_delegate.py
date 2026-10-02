@@ -8,6 +8,9 @@ import tempfile
 
 import delegate
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+import ensure_launcher
+
 
 def test_build_user_content_text_only():
     assert delegate.build_user_content("hi", []) == "hi"
@@ -434,6 +437,68 @@ def test_bench_never_scores_a_failed_worker():
     assert "Worker completed 1 of 2 tasks" in text, text
     assert "never counted as a saving" in text, text
     assert "90.0% over 1/2 completed" in text, text
+
+
+def test_ensure_launcher_creates_when_missing():
+    with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as bin_dir:
+            target = os.path.join(root, "delegate.py")
+            with open(target, "w", encoding="utf-8") as f:
+                f.write("# payload\n")
+            assert ensure_launcher.ensure(bin_dir, root) == "created"
+            launcher = os.path.join(bin_dir, "delegate")
+            assert os.path.exists(launcher)
+            with open(launcher, "r", encoding="utf-8") as f:
+                text = f.read()
+            assert ensure_launcher.launcher_target(text) == target.replace("\\", "/")
+
+
+def test_ensure_launcher_keeps_live_checkout():
+    with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as other:
+            with tempfile.TemporaryDirectory() as bin_dir:
+                live = os.path.join(other, "delegate.py")
+                with open(live, "w", encoding="utf-8") as f:
+                    f.write("# live\n")
+                launcher = os.path.join(bin_dir, "delegate")
+                original = ('#!/usr/bin/env bash\n'
+                            'exec "%s" "%s" "$@"\n'
+                            % (sys.executable, live.replace("\\", "/")))
+                # newline="" so Windows does not translate \n to \r\n: the byte-for-byte
+                # comparison below is the point of this test, and a real launcher must be
+                # LF-only anyway or Git Bash rejects the shebang.
+                with open(launcher, "w", encoding="utf-8", newline="") as f:
+                    f.write(original)
+                with open(os.path.join(root, "delegate.py"), "w", encoding="utf-8") as f:
+                    f.write("# payload\n")
+                assert ensure_launcher.ensure(bin_dir, root) == "kept"
+                with open(launcher, "rb") as f:
+                    assert f.read() == original.encode("utf-8")
+
+
+def test_ensure_launcher_refreshes_stale():
+    with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as bin_dir:
+            launcher = os.path.join(bin_dir, "delegate")
+            stale = os.path.join(bin_dir, "gone", "delegate.py")
+            with open(launcher, "w", encoding="utf-8") as f:
+                f.write('#!/usr/bin/env bash\n'
+                        'exec "%s" "%s" "$@"\n'
+                        % (sys.executable, stale.replace("\\", "/")))
+            target = os.path.join(root, "delegate.py")
+            with open(target, "w", encoding="utf-8") as f:
+                f.write("# payload\n")
+            assert ensure_launcher.ensure(bin_dir, root) == "refreshed"
+            with open(launcher, "r", encoding="utf-8") as f:
+                text = f.read()
+            assert ensure_launcher.launcher_target(text) == target.replace("\\", "/")
+
+
+def test_ensure_launcher_no_payload_is_noop():
+    with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as bin_dir:
+            assert ensure_launcher.ensure(bin_dir, root) == "kept"
+            assert not os.path.exists(os.path.join(bin_dir, "delegate"))
 
 
 if __name__ == "__main__":
