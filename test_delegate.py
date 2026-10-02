@@ -292,7 +292,19 @@ def test_bench_constants_match_results_file():
         fields = [f.strip() for f in line.strip().strip("|").split("|")]
         if len(fields) != 8 or not fields[4].isdigit():
             continue  # header, separator, or prose
+        if fields[6] == "-":
+            # Worker failed, so the task is deliberately unscored. Collect it as a
+            # task row anyway, so the count check below fails with a clear message
+            # instead of float() raising on "-".
+            savings.append(None)
+            continue
         savings.append(float(fields[6]))
+
+    unscored = savings.count(None)
+    assert not unscored, (
+        f"bench/RESULTS.md has {unscored} unscored task row(s): the worker failed "
+        f"{unscored} of {len(savings)} tasks, so this run must not be used to set "
+        "REVIEW_RATIO. Re-run the benchmark until every task completes.")
 
     assert len(savings) == delegate.BENCH_TASK_COUNT, (
         f"bench/RESULTS.md has {len(savings)} task rows but BENCH_TASK_COUNT is "
@@ -309,6 +321,119 @@ def test_bench_constants_match_results_file():
     assert medians_savings == expected_median, (
         f"bench/RESULTS.md Medians savings is {medians_savings} but REVIEW_RATIO gives "
         f"{expected_median}; update REVIEW_RATIO in delegate.py")
+
+
+def test_resolve_positionals_treats_a_lone_argument_as_the_task():
+    known = {"free": {}, "deepseek": {}}
+    # The regression: `delegate "<task>"` used to die with
+    # "Unknown backend '<the whole task text>'".
+    assert delegate.resolve_positionals("add type hints to utils.py", None, known) == (
+        "free", "add type hints to utils.py")
+    # An explicit backend is still honoured, and so is an explicit paid tier.
+    assert delegate.resolve_positionals("free", "do a thing", known) == (
+        "free", "do a thing")
+    assert delegate.resolve_positionals("deepseek", "do a thing", known) == (
+        "deepseek", "do a thing")
+    # Nothing at all: default tier, no task (main() then reports the missing task).
+    assert delegate.resolve_positionals(None, None, known) == ("free", None)
+    # A bare backend name with no task must NOT become the task.
+    assert delegate.resolve_positionals("free", None, known) == ("free", None)
+
+
+def test_fallback_for_picks_the_configured_hop():
+    cfg = {"backends": {"free": {}, "deepseek": {}}}
+    assert delegate.fallback_for("free", cfg) == "deepseek"
+    # No hop defined for a paid tier: it is already the escalation target.
+    assert delegate.fallback_for("deepseek", cfg) is None
+
+
+def test_fallback_for_declines_when_model_pinned():
+    cfg = {"backends": {"free": {}, "deepseek": {}}}
+    # A pinned model id belongs to one backend; carrying it over would 404.
+    assert delegate.fallback_for("free", cfg, model_override="auto/coding") is None
+
+
+def test_fallback_for_declines_when_hop_not_configured():
+    assert delegate.fallback_for("free", {"backends": {"free": {}}}) is None
+
+
+def test_summarize_ledger_excludes_failed_attempts():
+    rows = [
+        {"ts": "2026-10-01T10:00:00Z", "backend": "free", "model": "auto/coding",
+         "repo": "alpha", "prompt": 10, "completion": 5, "total": 15, "calls": 1,
+         "ok": False, "escalated_to": "deepseek"},
+        {"ts": "2026-10-01T10:01:00Z", "backend": "deepseek", "model": "deepseek-chat",
+         "repo": "alpha", "prompt": 100, "completion": 50, "total": 150, "calls": 2,
+         "ok": True, "escalated_from": "free"},
+    ]
+    s = delegate.summarize_ledger(rows)
+    # The failed attempt's tokens bought nothing, so they are not an offload.
+    assert s["runs"] == 1, s["runs"]
+    assert s["total"] == 150, s["total"]
+    assert s["failed_attempts"] == 1, s["failed_attempts"]
+    assert s["attempts_by_backend"]["free"] == {"failed": 1, "escalated": 1}
+    assert "free" not in s["by_backend"], s["by_backend"]
+
+
+def test_summarize_ledger_treats_missing_ok_as_success():
+    # Rows written before the "ok" field existed must keep counting as runs.
+    rows = [{"ts": "2026-09-01T10:00:00Z", "backend": "deepseek", "total": 150}]
+    s = delegate.summarize_ledger(rows)
+    assert s["runs"] == 1, s["runs"]
+    assert s["failed_attempts"] == 0, s["failed_attempts"]
+
+
+def test_snapshot_drops_provider_error_text():
+    import tempfile
+    rows = [{"ts": "2026-10-01T10:00:00Z", "backend": "free", "total": 0, "ok": False,
+             "repo": "secret-project", "error": "HTTP 502: gateway at 10.0.0.5 said no"}]
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "snap.jsonl")
+        assert delegate.write_snapshot(rows, path) == 1
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    assert "secret-project" not in text, text
+    assert "10.0.0.5" not in text, text
+    assert '"ok": false' in text, text
+
+
+def test_bench_never_scores_a_failed_worker():
+    """The bug this guards: a failed worker leaves an empty diff, an empty diff is
+    cheap to review, and a cheap review used to score as HIGH savings -- so the
+    published headline rose as the worker got worse."""
+    import tempfile
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bench"))
+    import run_bench
+
+    # A failed worker has no review tokens, so it must not produce a savings number.
+    assert run_bench.savings_pct(1000, 0) is None
+    assert run_bench.savings_pct(1000, 100) == 90.0
+
+    rows = [
+        {"id": "good", "tier": "mechanical", "t_do": 1000, "t_review": 100,
+         "t_worker": 500, "inline_ok": True, "worker_ok": True, "error": None,
+         "savings": 90.0},
+        {"id": "bad", "tier": "substantial", "t_do": 1000, "t_review": 0,
+         "t_worker": 0, "inline_ok": True, "worker_ok": False,
+         "error": "worker did not complete; not scored", "savings": None},
+    ]
+    medians = {"t_do": 1000, "t_review": 100, "t_worker": 500,
+               "savings": round(run_bench.median([r["savings"] for r in rows]), 1)}
+    # The failed task must not drag the median, in either direction.
+    assert medians["savings"] == 90.0, medians
+
+    class _Args:
+        baseline = "deepseek"
+        worker = "free"
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "RESULTS.md")
+        run_bench.write_results(path, _Args(), rows, medians, 500, "now")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    assert "Worker completed 1 of 2 tasks" in text, text
+    assert "never counted as a saving" in text, text
+    assert "90.0% over 1/2 completed" in text, text
 
 
 if __name__ == "__main__":

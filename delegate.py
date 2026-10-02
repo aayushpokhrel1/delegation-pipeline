@@ -91,6 +91,57 @@ DEFAULT_CONFIG = {
     "request_timeout": 180,
 }
 
+# Backend used when the caller names none. `free` costs nothing and, measured over
+# bench/tasks.json, reviewing its diff costs the same as reviewing a paid worker's.
+# Its one weakness is finishing: the OmniRoute pool drains under sustained load
+# (2026-10-01: 5 of 9 tasks back-to-back, the other 4 all passing when retried alone).
+# So the default is free and the chain below carries the failures, rather than the
+# caller having to guess which tier a task deserves.
+DEFAULT_BACKEND = "free"
+
+# One hop, deliberately. A chain that re-rolls through every configured backend would
+# turn one dry pool into four slow failures before the caller hears about it.
+FALLBACK_BACKEND = {"free": "deepseek"}
+
+
+class BackendError(RuntimeError):
+    """A backend could not be reached or kept failing. Carries how far the worker
+    got, because escalating after edits have landed would run the next backend
+    against a half-edited tree."""
+
+    def __init__(self, message, edits=0, usage=None):
+        super().__init__(message)
+        self.edits = edits
+        self.usage = usage or {}
+
+
+def resolve_positionals(backend, task, known_backends):
+    """Return (backend, task) with the default tier filled in.
+
+    `backend` and `task` are both optional positionals, so `delegate "<task>"`
+    binds the task to `backend` and argparse cannot tell the difference. When the
+    first argument is not a configured backend and nothing followed it, it is the
+    task. Without this, defaulting the backend made the common one-argument call
+    fail with "Unknown backend '<your whole task>'".
+    """
+    if backend and backend not in known_backends and not task:
+        return DEFAULT_BACKEND, backend
+    return backend or DEFAULT_BACKEND, task
+
+
+def fallback_for(name, cfg, model_override=None):
+    """The backend to escalate to when `name` fails, or None.
+
+    None when the caller pinned --model (a model id is backend-specific, so carrying
+    it to another backend would 404), when no hop is defined, or when the hop is not
+    configured on this machine."""
+    if model_override:
+        return None
+    nxt = FALLBACK_BACKEND.get(name)
+    if not nxt or nxt == name or nxt not in cfg.get("backends", {}):
+        return None
+    return nxt
+
 CONFIG_PATH = os.path.join(
     os.path.expanduser("~"), ".claude", "delegate.config.json"
 )
@@ -101,7 +152,18 @@ LEDGER_PATH = os.environ.get("DELEGATE_LEDGER") or os.path.join(
 # Median T_review / T_do from bench/RESULTS.md: reviewing a worker's diff costs
 # about 14.4% of what doing the task inline costs, so ~85.6% of an offloaded
 # task's tokens never reach the Claude subscription.
+#
+# CAVEAT, and do not drop it from anything that prints a number derived here:
+# this ratio was measured with BENCH_BASELINE on BOTH sides of the bench (the
+# same model did the task inline AND reviewed the worker's diff), on nine small
+# single-file tasks. Everything downstream applies it to *worker* tokens to
+# predict *orchestrator* (Opus) tokens, which assumes deepseek and Opus spend
+# comparable tokens on the same task. That assumption is untested. The
+# direction is sound; the figure is indicative, not billing-grade. If you
+# re-run the bench with --baseline opus, delete this paragraph.
 REVIEW_RATIO = 0.144
+# Model on both sides of the benchmark that produced REVIEW_RATIO.
+BENCH_BASELINE = "deepseek-chat"
 # Spread of the per-task savings in bench/RESULTS.md, published alongside the
 # median so the headline figure is not mistaken for a precise one. A test
 # asserts these still match that file, so re-running the benchmark and
@@ -112,7 +174,9 @@ BENCH_TASK_COUNT = 9
 # A redacted copy of the ledger, committed so the published numbers can be
 # recomputed by anyone. Repo names are private and never included.
 SNAPSHOT_PATH = os.path.join("bench", "ledger-snapshot.jsonl")
-SNAPSHOT_DROP_FIELDS = ("repo",)
+# Dropped before publication. "error" holds a raw provider payload, which has
+# carried gateway URLs and account hints, so it never goes in a committed file.
+SNAPSHOT_DROP_FIELDS = ("repo", "error")
 # Rough blended USD per 1M tokens actually paid on each worker tier.
 # Backends not listed here are free tiers ($0).
 WORKER_PRICE_PER_MTOK = {"deepseek": 0.28, "kimi": 2.0}
@@ -194,6 +258,29 @@ def record_run(entry):
         return False
 
 
+def _attempt_entry(name, backend_cfg, err, started, escalated_to=None):
+    """A ledger row for a backend attempt that FAILED. Written so a dry tier leaves
+    a trace: before this existed, a failed run wrote nothing, and "never routed
+    here" looked identical to "routed here and it died"."""
+    return {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "backend": name,
+        "model": backend_cfg.get("model"),
+        "repo": os.path.basename(ROOT) or ROOT,
+        "prompt": (err.usage or {}).get("prompt_tokens", 0),
+        "completion": (err.usage or {}).get("completion_tokens", 0),
+        "total": (err.usage or {}).get("total_tokens", 0),
+        "calls": (err.usage or {}).get("calls", 0),
+        "elapsed_s": round(time.monotonic() - started, 1),
+        "ok": False,
+        "error": str(err)[:300],
+        "edits": err.edits,
+        "escalated_to": escalated_to,
+        "verify": None,
+        "commit": None,
+    }
+
+
 def summarize_ledger(rows):
     """Aggregate ledger rows into the totals --stats prints. Pure: takes a list
     of dicts, returns a dict, touches no files."""
@@ -201,6 +288,18 @@ def summarize_ledger(rows):
     worker_usd = 0.0
     verify_failed = 0
     commits = 0
+    # Rows written before the "ok" field existed are all successes, so a missing
+    # "ok" means True. Failed attempts are counted but kept out of the savings
+    # math: tokens spent on a run that produced nothing are not an offload.
+    failed = [r for r in rows if r.get("ok") is False]
+    rows = [r for r in rows if r.get("ok") is not False]
+    attempts_by_backend = {}
+    for r in failed:
+        slot = attempts_by_backend.setdefault(
+            r.get("backend") or "unknown", {"failed": 0, "escalated": 0})
+        slot["failed"] += 1
+        if r.get("escalated_to"):
+            slot["escalated"] += 1
     timestamps = []
     by_backend = {}
     by_model = {}
@@ -238,6 +337,8 @@ def summarize_ledger(rows):
     avoided = round(total * (1 - REVIEW_RATIO))
     return {
         "runs": len(rows),
+        "failed_attempts": len(failed),
+        "attempts_by_backend": attempts_by_backend,
         "prompt": prompt,
         "completion": completion,
         "total": total,
@@ -314,7 +415,18 @@ def print_stats():
     print(f"claude tokens avoided  ~{format(s['avoided'], ',')}   "
           f"({pct}% of offloaded, ratio from bench/RESULTS.md)")
     print(f"opus-equivalent value  ~${s['avoided_usd']:.2f}")
+    print(f"  the two ~ rows are estimates: ratio measured {BENCH_BASELINE} on both")
+    print(f"  sides of {BENCH_TASK_COUNT} bench tasks ({BENCH_SAVINGS_MIN}-{BENCH_SAVINGS_MAX}% spread), then applied to")
+    print("  worker tokens as a stand-in for Opus token counts. Direction, not billing.")
     print(f"verify failures {s['verify_failed']}   commits {s['commits']}")
+    if s["failed_attempts"]:
+        parts = ", ".join(
+            f"{k} {v['failed']} failed ({v['escalated']} escalated)"
+            for k, v in sorted(s["attempts_by_backend"].items()))
+        print(f"failed attempts {s['failed_attempts']}   {parts}")
+        print("  (excluded from the totals above: a run that produced nothing is")
+        print("   not an offload. A tier with 0 runs and 0 failed attempts was")
+        print("   never routed to at all.)")
     print()
 
     for label, group in (("backend", s["by_backend"]), ("model", s["by_model"]),
@@ -400,6 +512,12 @@ def stats_markdown(s):
         f"{BENCH_SAVINGS_MAX}%. Reviewing a",
         f"worker's diff costs about {review_pct}% of doing the task inline. Dollar figures",
         "are rough blended per-tier prices, for scale, not billing.",
+        "",
+        f"That ratio was measured with `{BENCH_BASELINE}` on both sides of the benchmark:",
+        "the same model did each task inline and reviewed the worker's diff. It is applied",
+        "above to worker tokens as a stand-in for what the orchestrator model would have",
+        "spent on the same work, which is an assumption the benchmark does not test. Read",
+        "the direction as sound and the absolute figures as indicative.",
         "",
         "Every figure above can be recomputed from the redacted ledger committed at",
         "[`bench/ledger-snapshot.jsonl`](bench/ledger-snapshot.jsonl), using this exact",
@@ -879,7 +997,8 @@ def chat_completion(backend, messages, timeout):
         except (urllib.error.URLError, TimeoutError) as e:
             last_err = f"connection error: {e}"
             time.sleep(1.5 * (attempt + 1))
-    die(f"request to {url} failed: {last_err}")
+    # Raise rather than die(): main() may still have a fallback backend to try.
+    raise BackendError(f"request to {url} failed: {last_err}")
 
 
 # --------------------------------------------------------------------------- #
@@ -914,7 +1033,12 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None):
     edits = 0
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0}
     for step in range(1, max_steps + 1):
-        resp = chat_completion(backend, messages, timeout)
+        try:
+            resp = chat_completion(backend, messages, timeout)
+        except BackendError as e:
+            e.edits = edits
+            e.usage = usage
+            raise
         u = resp.get("usage") or {}
         if u:
             usage["prompt_tokens"] += u.get("prompt_tokens", 0) or 0
@@ -1079,15 +1203,16 @@ def main():
         else:
             print_stats()
         return
-    if not args.backend:
-        parser.error("backend is required")
-
     if args.dir:
         ROOT = os.path.realpath(args.dir)
         if not os.path.isdir(ROOT):
             die(f"--dir is not a directory: {args.dir}")
 
     cfg = load_config()
+
+    args.backend, args.task = resolve_positionals(
+        args.backend, args.task, cfg["backends"])
+
     backend = resolve_backend(cfg, args.backend)
     if args.model:
         backend["model"] = args.model
@@ -1113,7 +1238,33 @@ def main():
     log(f"delegate: backend={args.backend} model={backend['model']} root={ROOT}"
         + (f" images={len(image_uris)}" if image_uris else ""))
     started = time.monotonic()
-    summary, usage = agent_loop(backend, args.task, max_steps, timeout, image_uris)
+
+    # Try the chosen backend, then escalate once if it could not be reached. Only
+    # escalate on a ZERO-edit failure: once the worker has written to the tree, the
+    # next backend would start from a half-applied change nobody reviewed.
+    used_backend, used_cfg = args.backend, backend
+    escalated_from = None
+    while True:
+        try:
+            summary, usage = agent_loop(
+                used_cfg, args.task, max_steps, timeout, image_uris)
+            break
+        except BackendError as e:
+            nxt = fallback_for(used_backend, cfg, args.model) if not e.edits else None
+            record_run(_attempt_entry(used_backend, used_cfg, e, started,
+                                      escalated_to=nxt))
+            if not nxt:
+                if e.edits:
+                    die(f"{used_backend} failed after {e.edits} edit(s), so it was not "
+                        f"escalated (the tree is half-edited; review it): {e}")
+                die(f"{used_backend} failed and no fallback is available: {e}")
+            log(f"delegate: {used_backend} failed with no edits made, escalating to "
+                f"{nxt}: {e}")
+            escalated_from, used_backend = used_backend, nxt
+            used_cfg = resolve_backend(cfg, nxt)
+            used_cfg.setdefault("temperature", cfg.get("temperature"))
+            used_cfg.setdefault("max_tokens", cfg.get("max_tokens"))
+            log(f"delegate: backend={used_backend} model={used_cfg['model']} root={ROOT}")
 
     # Worker tokens ran on the free/cheap backend, not the Claude subscription.
     # Emit this before verify/commit so the trailer survives a failed verify
@@ -1130,8 +1281,13 @@ def main():
 
     entry = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "backend": args.backend,
-        "model": backend["model"],
+        "backend": used_backend,
+        "model": used_cfg["model"],
+        # Written on every run so a later reader can tell "this tier was never tried"
+        # from "it was tried and died" -- a distinction the ledger used to lose,
+        # because a failed run wrote no row at all.
+        "ok": True,
+        "escalated_from": escalated_from,
         "repo": os.path.basename(ROOT) or ROOT,
         "prompt": usage["prompt_tokens"],
         "completion": usage["completion_tokens"],
