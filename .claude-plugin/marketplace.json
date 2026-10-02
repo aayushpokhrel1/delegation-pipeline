@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "delegation-pipeline",
-      "description": "The /delegate and /orchestrate commands and skills: offload any diff-verifiable work to free/cheap OpenAI-compatible workers, defaulting to the free tier and escalating to deepseek on failure, verify and commit, then review the diff. Needs the worker binary from install.sh.",
+      "description": "The /delegate and /orchestrate commands and skills: offload any diff-verifiable work to free/cheap OpenAI-compatible workers, defaulting to the free tier and escalating to deepseek on failure, verify and commit, then review the diff. The worker is included and set up on first session start.",
       "source": "./",
       "category": "productivity"
     }

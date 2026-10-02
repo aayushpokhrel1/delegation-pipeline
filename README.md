@@ -160,23 +160,6 @@ could not distinguish from a tier that was tried and died.
 
 ## Install
 
-Clone this repo anywhere, then run the installer for your OS:
-
-```bash
-bash install.sh
-```
-
-```powershell
-./install.ps1
-```
-
-This writes a `delegate` launcher into `~/.claude/bin/` (pointing at your checkout) and
-seeds `~/.claude/delegate.config.json` from the example. Re-run after moving the repo. It no
-longer copies the slash commands, those ship with the plugin (next), so they are not
-duplicated.
-
-### Install the plugin (commands + skills)
-
 The `/delegate` + `/orchestrate` commands and the `delegate` / `orchestrate` skills ship as a
 Claude Code plugin, which makes them available in **every** project (and the skills
 model-invokable, so "orchestrate it" works anywhere):
@@ -187,6 +170,37 @@ claude plugin install delegation-pipeline
 ```
 
 (Or the interactive `/plugin marketplace add ...` and `/plugin install ...`.)
+
+**That is the whole install.** The plugin carries the commands, the skills, and the worker
+itself: a [`SessionStart` hook](hooks/hooks.json) runs
+[`scripts/ensure_launcher.py`](scripts/ensure_launcher.py), which writes the
+`~/.claude/bin/delegate` launcher pointing at the plugin's own copy of `delegate.py`. It
+appears at the start of your next Claude Code session, with no clone and no installer.
+
+The backends still need their own setup, which is the one manual step: the `free` tier wants
+a local OmniRoute gateway running, and the remote tiers want an API key. See
+[Keys](#keys) and [Autostart](#autostart).
+
+### Clone-based install
+
+The clone-based install is **optional** and aimed at people who want to work on this repo:
+
+```bash
+bash install.sh
+```
+
+```powershell
+./install.ps1
+```
+
+This writes a `delegate` launcher into `~/.claude/bin/` pointing at **your checkout** rather
+than the plugin's copy, so your edits to `delegate.py` take effect immediately. It also seeds
+`~/.claude/delegate.config.json` from the example and installs the post-commit plugin-refresh
+hook described below. Re-run after moving the repo. It does not copy the slash commands,
+those ship with the plugin above.
+
+The session-start hook will not undo this: it leaves any launcher alone whose target still
+exists, and only writes one when none exists or when the path it points at has gone away.
 
 #### If you develop this repo, point the marketplace at your checkout
 
@@ -225,9 +239,9 @@ paths (`__pycache__/`, `graphify-out/`) land in the installed copy. Convenient w
 iterating, but it means a half-finished `SKILL.md` becomes live guidance, so finish an edit
 before reinstalling.
 
-**Two pieces, by design:** the plugin carries the Claude-facing commands + skills; `install.sh`
-/ `install.ps1` carry the machine-side worker binary (`~/.claude/bin/delegate`) and config,
-which a plugin cannot ship. Run both once on a new device.
+**One piece, not two.** The plugin ships the commands, the skills, and the worker, and sets
+up its own launcher. A clone only changes which copy of `delegate.py` that launcher points
+at, which is what you want while developing this repo and nothing you need otherwise.
 
 ### Keys
 

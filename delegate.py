@@ -16,9 +16,9 @@ Usage:
     delegate.py free --verify "npm test" --commit "feat: x" "Implement x per spec"
 
 --verify runs the given command after the worker edits; a non-zero exit prints the
-command output and exits 2 without committing. --commit stages and commits only
-the files the worker edited, but only when verify passed (or no --verify was set). This lets the
-orchestrator hand off a task and get back a tested, committed result at no Claude
+command output and exits 2 without committing. --commit stages and commits only the
+files the worker edited, and only when verify passed (or no --verify was set). This
+lets the orchestrator hand off a task and get back a tested, committed result at no Claude
 token cost, while the worker model itself still never runs shell or git.
 
 Backends are defined in ~/.claude/delegate.config.json (see config.example.json).
