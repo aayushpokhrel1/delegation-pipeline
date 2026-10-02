@@ -27,9 +27,19 @@ That is coding work that ran on the free/cheap tier instead of your Claude subsc
 savings% = 1 - T_review / T_do
 ```
 
-The ratio is model independent: whatever your orchestrator charges per token, delegating
-replaces `T_do` worth of it with `T_review` worth. So a ratio measured on deepseek transfers
-to Opus without needing a Claude backend key.
+**The ratio is NOT model independent, despite what this file used to claim here.** The
+argument was that delegating replaces `T_do` worth of orchestrator tokens with `T_review`
+worth whatever the orchestrator charges, so a ratio measured on deepseek carries to Opus.
+That holds for the *prices* and not for the *token counts*. `T_do` and `T_review` are both
+properties of the model that produced them: a run measures deepseek reviewing versus
+deepseek doing, and the quantity being predicted is Opus reviewing versus Opus doing.
+Worse, `delegate --stats` multiplies the ratio against *worker* tokens, which additionally
+assumes deepseek and Opus spend comparable tokens on the same task. Nothing here tests that.
+
+Treat the direction as sound (reviewing a diff is much cheaper than doing the work) and the
+absolute figure as indicative. To measure it properly, run `--baseline` against an
+Opus-backed OpenAI-compatible endpoint; the "no Claude key needed" convenience is exactly
+what costs the claim its rigour.
 
 ## How to run
 
@@ -43,8 +53,16 @@ to `bench/RESULTS.md` and printed to stdout. Each task runs in a throwaway copy 
 `fixtures/`, and every arm is gated by a pytest that fails until the task is actually done, so a
 row only counts if the change really worked (`inline ok` / `worker ok` = yes).
 
+A task whose worker arm failed is **left unscored** and excluded from the medians, and the
+results file says how many of the tasks the medians cover. This is load-bearing, not tidiness:
+a failed worker leaves an empty diff, an empty diff is cheap to review, and a cheap review
+used to score as *high* savings, so the headline rose as the worker got worse. A free-backend
+run on 2026-10-01 recorded its best number, 90.4%, on a task where the worker produced
+nothing at all.
+
 Requires `pip install pytest` and a usable backend key. Numbers vary run to run (temperature
-0.2); across runs the per-task savings land in roughly the 74-93% band, median ~75-86%.
+0.2). The committed `RESULTS.md` run spans 60.7-89.7% per task with a median of 85.6%; expect
+a similar spread rather than a repeatable figure.
 
 ## Checking the task set
 
@@ -67,8 +85,13 @@ inside it would leak the answer.
 
 ## Latest result
 
-See [RESULTS.md](RESULTS.md). A representative run: median **86% fewer orchestrator tokens**
-per task, with ~20k tokens of actual coding work pushed onto the cheap tier across four tasks.
+See [RESULTS.md](RESULTS.md), which is generated, so it is the only figure worth quoting.
+The committed run: median **85.6% fewer orchestrator tokens** per task over 9 tasks, with
+71,116 tokens of actual coding work pushed onto the cheap tier.
+
+Do not restate those numbers anywhere else. A hand-copied table in the top-level README kept
+claiming a 4-task run and a "74-93% band" for weeks after this became a 9-task run spanning
+60.7-89.7%, which is why that copy was deleted rather than corrected.
 
 ## A real orchestrator data point
 
@@ -80,7 +103,14 @@ measures, on the real orchestrator, on a non-toy file.
 ## The honest caveats
 
 - `T_do` on the baseline model is a proxy for what the orchestrator would spend inline; the
-  claim is the *ratio*, not the absolute token counts.
+  claim is the *ratio*, not the absolute token counts. And the ratio itself was measured with
+  one model on both sides, so it is not transferable to another model without re-measuring
+  (see "What it measures" above).
+- The worker arm measures **reliability as well as capability**, and the two look alike in a
+  single run. On 2026-10-01 the `free` backend failed 4 of 9 tasks back-to-back, yet 3 of
+  those 4 passed when retried alone and the 4th never reached a model (a gateway 502). Read
+  consecutive failures late in a run as a drained pool, not a weak model, and retry them
+  individually before concluding anything about quality.
 - `T_review` includes the full brief text, so the overhead is if anything over-counted and the
   savings reported conservatively.
 - Worker/cheap-tier tokens are never counted as savings on the orchestrator side; they are

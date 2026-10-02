@@ -1,9 +1,12 @@
 # Choosing a model (orchestrator cheat-sheet)
 
-`delegate.py` never picks a model on its own beyond the per-backend default. The
-**orchestrator** (Opus) chooses: first the backend, then the model/route via `--model`,
-matched to the task. For `free` (OmniRoute) that means an `auto/*` route; for `nvidia`
-(and the paid backends) it means a concrete model id.
+**Read this only when you have a reason to pin a model.** The backend is no longer the
+orchestrator's choice: `delegate "<task>"` defaults to `free` and escalates to `deepseek` on
+failure, and each backend has a default model, so the normal path needs nothing from this
+file. Naming `--model` also *disables* the escalation, since a model id belongs to one
+backend. Pin one for a specific capability (vision, a stronger free model, forcing a no-cost
+route), not as routine practice. For `free` (OmniRoute) a pin means an `auto/*` route; for
+`nvidia` and the paid backends it means a concrete model id.
 
 ## The worker needs tool calling
 
@@ -28,9 +31,15 @@ concrete id only when you deliberately want that provider.
 | **Force only no-cost routes**               | `auto/coding:free`      |
 | **Prefer the most reliable free route**     | `auto/coding:reliable`  |
 
-`delegate free --list-models` shows every route alias and all ~115 concrete model ids. If a
-route keeps 403/429-ing, the keyless pool is exhausted, add provider keys in the OmniRoute
-dashboard (you have Groq/Cerebras/Gemini/Mistral/OpenRouter) or switch to `nvidia`.
+`delegate free --list-models` shows every route alias and every concrete model id. The
+catalog grows fast, so do not trust a count written here: it said "~115" while the live
+gateway was serving 1,560 ids (38 of them `auto/*` routes) on 2026-10-02. Run the command.
+
+If a route keeps 403/429-ing, the keyless pool is exhausted, add provider keys in the
+OmniRoute dashboard (you have Groq/Cerebras/Gemini/Mistral/OpenRouter) or switch to `nvidia`.
+A 502 naming several providers at once (`Model is unavailable`, `exhausted_connection`) means
+the pool itself has run dry rather than one route: that is the failure the automatic
+`free` -> `deepseek` escalation exists to absorb.
 
 ## NVIDIA backend: task -> model
 

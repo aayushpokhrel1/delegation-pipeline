@@ -12,9 +12,16 @@ Rules:
 
 | File | What it holds |
 | --- | --- |
-| `README.md` | What it is, the backends, and how to install it |
-| `MODELS.md` | The current model shortlist per backend. Goes stale fast: check it against `delegate <backend> --list-models` rather than trusting it |
+| `README.md` | What it is, the backends, how to install it, and the generated "Measured impact" block |
+| `MODELS.md` | Model shortlist per backend, for when you pin `--model`. Goes stale fast: check it against `delegate <backend> --list-models` rather than trusting it |
+| `bench/README.md` | What the benchmark measures, how to run it, and what its ratio does **not** prove |
+| `bench/RESULTS.md` | The last benchmark run. `REVIEW_RATIO` in `delegate.py` is derived from it, and a test asserts they agree, so it is generated, never hand-edited |
+| `skills/*/SKILL.md`, `commands/*.md` | What Claude is told about delegating. These ship as the plugin, so editing one changes behaviour in every project |
 | `CLAUDE.md` | This file |
+
+**The skills and commands are instructions, not documentation.** A stale one does not break,
+it quietly steers every session, so they are the first thing to correct when behaviour
+changes, and `scripts/post-commit-refresh-plugin.sh` reinstalls the plugin when they do.
 
 There is no `HANDOVER.md` here. If one is ever added it holds **current state only** - where
 things stand, what is half-done, what is next. Before adding a line to any such file, ask: will

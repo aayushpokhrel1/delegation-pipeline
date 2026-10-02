@@ -44,3 +44,8 @@
 {"backend": "deepseek", "calls": 40, "commit": null, "completion": 3114, "elapsed_s": 61.9, "model": "deepseek-chat", "prompt": 1625726, "total": 1628840, "ts": "2026-10-01T22:50:51Z", "verify": null}
 {"backend": "deepseek", "calls": 4, "commit": "8f7d76b", "completion": 3378, "elapsed_s": 13.5, "model": "deepseek-chat", "prompt": 25199, "total": 28577, "ts": "2026-10-01T22:55:15Z", "verify": "passed"}
 {"backend": "deepseek", "calls": 17, "commit": "d6ab9c7", "completion": 5148, "elapsed_s": 34.8, "model": "deepseek-chat", "prompt": 225276, "total": 230424, "ts": "2026-10-01T22:58:36Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 16, "commit": null, "completion": 5589, "elapsed_s": 35.2, "model": "deepseek-chat", "prompt": 255415, "total": 261004, "ts": "2026-10-01T23:16:58Z", "verify": null}
+{"backend": "deepseek", "calls": 33, "commit": "041a35d", "completion": 11245, "elapsed_s": 70.1, "model": "deepseek-chat", "prompt": 808845, "total": 820090, "ts": "2026-10-01T23:24:42Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 32, "commit": "0c9af3f", "completion": 9940, "elapsed_s": 73.8, "escalated_from": null, "model": "deepseek-chat", "ok": true, "prompt": 582789, "total": 592729, "ts": "2026-10-02T03:55:57Z", "verify": "passed"}
+{"backend": "deepseek", "calls": 7, "commit": null, "completion": 3880, "elapsed_s": 23.7, "escalated_from": null, "model": "deepseek-chat", "ok": true, "prompt": 107344, "total": 111224, "ts": "2026-10-02T03:56:58Z", "verify": null}
+{"backend": "deepseek", "calls": 12, "commit": "e83b3be", "completion": 1906, "elapsed_s": 20.6, "escalated_from": null, "model": "deepseek-chat", "ok": true, "prompt": 249901, "total": 251807, "ts": "2026-10-02T04:00:39Z", "verify": "passed"}
