@@ -50,6 +50,30 @@ Write-Host "For the /delegate + /orchestrate commands and skills, install the pl
 Write-Host "  claude plugin marketplace add aayushpokhrel1/delegation-pipeline"
 Write-Host "  claude plugin install delegation-pipeline"
 
+# Post-commit hook that reinstalls the plugin when skills/ commands/ .claude-plugin/
+# change, so an edited skill cannot keep serving its old text. The hook itself
+# no-ops unless this checkout is the plugin's marketplace source, so installing it
+# on a machine that uses the GitHub marketplace is harmless.
+$HookSrc = Join-Path $RepoDir "scripts\post-commit-refresh-plugin.sh"
+$GitDir  = (& git -C $RepoDir rev-parse --git-dir 2>$null)
+if ($LASTEXITCODE -eq 0 -and $GitDir -and (Test-Path $HookSrc)) {
+    if (-not [System.IO.Path]::IsPathRooted($GitDir)) { $GitDir = Join-Path $RepoDir $GitDir }
+    $HookDir = Join-Path $GitDir "hooks"
+    New-Item -ItemType Directory -Force $HookDir | Out-Null
+    $HookDst = Join-Path $HookDir "post-commit"
+    $mine = $true
+    if (Test-Path $HookDst) {
+        $mine = (Select-String -Path $HookDst -Pattern "post-commit-refresh-plugin" -Quiet)
+    }
+    if ($mine) {
+        Copy-Item $HookSrc $HookDst -Force
+        Write-Host "installed post-commit hook -> refreshes the plugin when skills/ commands/ .claude-plugin/ change"
+    } else {
+        Write-Host "Note: $HookDst exists and is not ours; left alone."
+        Write-Host "      To auto-refresh the installed plugin, chain in: $HookSrc"
+    }
+}
+
 Write-Host ""
 Write-Host "Done. Test it:"
 Write-Host "  & `"$Cmd`" free `"list the files here and summarize the project`""
