@@ -494,6 +494,28 @@ def test_ensure_launcher_refreshes_stale():
             assert ensure_launcher.launcher_target(text) == target.replace("\\", "/")
 
 
+def test_ensure_launcher_keeps_msys_checkout():
+    # install.sh under Git Bash writes /c/Users/... targets. Those must not read as stale,
+    # or the hook repoints a live developer checkout at the plugin's cached copy.
+    if os.name != "nt":
+        return
+    with tempfile.TemporaryDirectory() as root:
+        with tempfile.TemporaryDirectory() as other:
+            with tempfile.TemporaryDirectory() as bin_dir:
+                live = os.path.join(other, "delegate.py")
+                with open(live, "w", encoding="utf-8") as f:
+                    f.write("# live\n")
+                drive, rest = os.path.splitdrive(live)
+                msys = "/%s%s" % (drive[0].lower(), rest.replace("\\", "/"))
+                assert ensure_launcher.target_exists(msys), msys
+                launcher = os.path.join(bin_dir, "delegate")
+                with open(launcher, "w", encoding="utf-8", newline="") as f:
+                    f.write('#!/usr/bin/env bash\nexec "python" "%s" "$@"\n' % msys)
+                with open(os.path.join(root, "delegate.py"), "w", encoding="utf-8") as f:
+                    f.write("# payload\n")
+                assert ensure_launcher.ensure(bin_dir, root) == "kept"
+
+
 def test_ensure_launcher_no_payload_is_noop():
     with tempfile.TemporaryDirectory() as root:
         with tempfile.TemporaryDirectory() as bin_dir:

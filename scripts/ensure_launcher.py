@@ -21,6 +21,26 @@ def launcher_target(text):
     return m.group(2)
 
 
+def target_exists(path):
+    """True if a launcher's target is still on disk.
+
+    DO NOT replace this with a bare os.path.exists. install.sh runs under Git Bash on
+    Windows and writes an MSYS-style target (/c/Users/...), which native Python cannot
+    stat. Without the translation below, every such launcher looks stale, and the hook
+    silently repoints a developer's own checkout launcher at the plugin's cached copy,
+    so editing delegate.py in the checkout stops having any effect.
+    """
+    if not path:
+        return False
+    if os.path.exists(path):
+        return True
+    if os.name == "nt":
+        m = re.match(r"^/(?:mnt/)?([A-Za-z])/(.*)$", path)
+        if m:
+            return os.path.exists("%s:/%s" % (m.group(1), m.group(2)))
+    return False
+
+
 def _launcher_text(python_exe, target):
     posix_target = target.replace("\\", "/")
     return (
@@ -49,7 +69,7 @@ def ensure(bin_dir, plugin_root, python_exe=None):
         except OSError:
             existing = ""
         current = launcher_target(existing)
-        if current and os.path.exists(current):
+        if target_exists(current):
             return "kept"
         result = "refreshed"
     else:
