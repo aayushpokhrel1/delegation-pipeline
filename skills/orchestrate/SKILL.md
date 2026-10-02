@@ -24,22 +24,25 @@ itself.
 
 Any single axis landing in the escalate column sends that task to Tier A; otherwise Tier B.
 
-- **Complexity:** mechanical / boilerplate, or substantial-but-specifiable (a whole module,
-  a real refactor) -> Tier B (pick the backend below); needs broad codebase judgment ->
-  Tier A `sonnet` / `opus`.
+- **Complexity:** anything specifiable and diff-verifiable, from boilerplate up to a whole
+  module or a real refactor -> Tier B (do not pick a backend, see below); needs broad
+  codebase judgment -> Tier A `sonnet` / `opus`.
 - **Iteration depth:** verifiable in ~one shot -> Tier B; long autonomous run-fail-edit loop,
   or needs a live service / Docker / the app running -> Tier A subagent.
 - **Sensitivity:** ordinary code -> Tier B; security-sensitive or full-context debugging ->
   Tier A or the orchestrator itself.
 
-### Tier B backend: cheapest-that-fits
+### Tier B backend: let it default
 
-Once a task is Tier B, pick the **cheapest backend whose capability fits**, then escalate the
-*backend* (not the tier) if it fails. Each has a distinct job:
+Once a task is Tier B, **do not pick a backend**: run `delegate "<task>"` and let the CLI
+default to `free` and escalate to `deepseek` itself. Measured on `bench/tasks.json`
+(2026-10-01), reviewing a `free` diff costs the same as reviewing a paid one, so `free` is
+the less reliable tier, not the weaker one, and hand-routing by difficulty is what left it
+unused. Name a backend only for the specific jobs below:
 
-- **`free` (OmniRoute, $0 local, unlimited):** default for **mechanical / boilerplate / bulk**
-  when its pool is healthy. Slow; the pool can be dry or flaky. `--model auto/coding`, or
-  `auto/cheap` for high volume.
+- **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you. Slow; the pool
+  drains under sustained load, which the automatic escalation now covers. Name it explicitly
+  only to force $0 and fail rather than fall back.
 - **`openrouter` ($0 `:free`, rate-limited):** two jobs. (1) **free-remote fallback** when
   OmniRoute is dry, preferred over `nvidia` so nvidia's finite credits stay in reserve.
   (2) the **pin lever**: a specific fast/quality free model, one not on the nvidia account, or

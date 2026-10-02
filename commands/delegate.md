@@ -1,6 +1,6 @@
 ---
-description: Hand a task to a free/cheap worker (route by complexity: free for mechanical, deepseek for substantial), then review its diff
-argument-hint: [free|nvidia|openrouter|deepseek|kimi] <task description>
+description: Hand a task to a free/cheap worker (defaults to free, escalates to deepseek on failure), then review its diff
+argument-hint: [free|nvidia|openrouter|deepseek|kimi (optional, defaults to free)] <task description>
 allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
 
@@ -14,15 +14,15 @@ If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `o
 `deepseek`, `kimi`), use it and treat the rest as the **task**. Otherwise treat the whole
 thing as the task and **you choose the backend and model yourself** based on the task.
 
-**You are the router. Pick by task COMPLEXITY** (the gate is a tight, verifiable spec, not
-low difficulty):
-- **Backend:** `free` (OmniRoute, $0) for trivial / mechanical work when its pool is healthy;
-  `deepseek` (cheap, roughly Sonnet-class) for SUBSTANTIAL well-specified work, a whole
-  module, a real multi-file refactor, a non-trivial first draft (do not cap delegation at
-  boilerplate); `nvidia` (free trial credits, strong tool-calling models) when free is dry;
-  `openrouter` when you want to **pin** a specific fast `:free` or vision model, or NVIDIA is
-  dry and OmniRoute's free pool is exhausted (`:free` models are rate-limited, ~50 req/day at
-  $0); `kimi` only if the user asked.
+**Do not hand-route by difficulty** (the gate is a tight, verifiable spec, not low
+difficulty):
+- **Backend: omit it.** The CLI defaults to `free` ($0) and escalates once to `deepseek`
+  if `free` cannot be reached, which is measured to cost the same to review as a paid
+  worker's diff. Name a backend only for a reason: `deepseek` when the task must not be
+  retried from scratch or when pinning `--model` (pinning disables escalation);
+  `openrouter` to **pin** a specific fast `:free` or vision model (`:free` ids are
+  rate-limited, ~50 req/day at $0); `nvidia` for a stronger free model than a `:free` id
+  gives; `kimi` only if the user asked.
 - **Model (mainly for `nvidia` / `openrouter`):** pass `--model <id>` matched to the task.
   Read `MODELS.md` in this repo for the task->model shortlist, and run
   `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick
@@ -48,7 +48,7 @@ Follow this protocol:
    and point at a pattern to mirror if one exists. Do this reasoning yourself, cheaply.
 3. **Run the worker** with your chosen backend and (optionally) model:
    ```
-   ~/.claude/bin/delegate <backend> [--model <id>] "<your expanded self-contained instruction>"
+   ~/.claude/bin/delegate [backend] [--model <id>] "<your expanded self-contained instruction>"
    ```
    Its step logs go to stderr and its summary to stdout. A `free` worker can run for
    minutes (the free model is the slow part), so give the run a long foreground timeout

@@ -17,8 +17,12 @@ current repo. It **cannot** run shell commands or use git, by design: you (or yo
 orchestrator) review the resulting `git diff` and commit.
 
 ```
-~/.claude/bin/delegate <backend> "<task>"
+~/.claude/bin/delegate [backend] "<task>"
 ```
+
+The backend is optional and defaults to `free` ($0). When `free` cannot be reached,
+the run escalates once to `deepseek` automatically, so you do not have to guess a
+tier per task. See [Backends](#backends).
 
 ![demo](assets/demo.gif)
 
@@ -26,27 +30,28 @@ orchestrator) review the resulting `git diff` and commit.
 
 ### Measured impact
 
-_Generated 2026-09-28 from 17 delegated runs across 2 repos._
+_Generated 2026-10-01 from 46 delegated runs across 4 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 17 |
-| Tokens offloaded to workers | 8,218,510 (measured) |
-| Worker API calls | 288 |
-| Paid on the worker tier | $2.30 |
-| Claude tokens avoided | ~7,035,045 (estimated) |
-| Opus-equivalent value | ~$105.53 |
+| Runs delegated | 46 |
+| Tokens offloaded to workers | 25,111,144 (measured) |
+| Worker API calls | 898 |
+| Paid on the worker tier | $7.03 |
+| Claude tokens avoided | ~21,495,139 (estimated) |
+| Opus-equivalent value | ~$322.43 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   8,218,510 tokens
+deepseek  ████████████████████  100%   25,111,144 tokens
 ```
 
 By month:
 
 ```
-2026-09  ████████████████████   8,218,510 tokens
+2026-09  ████████████████████   20,873,682 tokens
+2026-10  ████░░░░░░░░░░░░░░░░   4,237,462 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
@@ -55,6 +60,12 @@ the median of 9 benchmark tasks in [`bench/RESULTS.md`](bench/RESULTS.md)
 whose individual savings ranged from 60.7% to 89.7%. Reviewing a
 worker's diff costs about 14.4% of doing the task inline. Dollar figures
 are rough blended per-tier prices, for scale, not billing.
+
+That ratio was measured with `deepseek-chat` on both sides of the benchmark:
+the same model did each task inline and reviewed the worker's diff. It is applied
+above to worker tokens as a stand-in for what the orchestrator model would have
+spent on the same work, which is an assumption the benchmark does not test. Read
+the direction as sound and the absolute figures as indicative.
 
 Every figure above can be recomputed from the redacted ledger committed at
 [`bench/ledger-snapshot.jsonl`](bench/ledger-snapshot.jsonl), using this exact
@@ -114,6 +125,36 @@ honest caveats live in [`bench/README.md`](bench/README.md).
 
 All of them are just an OpenAI-compatible base URL + model + key, configured in
 `~/.claude/delegate.config.json`.
+
+### Default tier and escalation
+
+Naming no backend gets you `free`. If `free` fails before the worker has edited
+anything, the run escalates once to `deepseek` and says so on stderr:
+
+```
+delegate: free failed with no edits made, escalating to deepseek: ...
+```
+
+Why it works this way, measured on `bench/tasks.json` on 2026-10-01: reviewing a
+`free` worker's diff costs the same as reviewing a paid one (85.4% vs 85.6% median
+savings), so `free` is not the lower-quality tier, only the less reliable one. It
+completed 5 of 9 tasks run back-to-back, while the 4 that failed all passed when
+retried alone, because the OmniRoute pool drains under sustained load. Defaulting to
+`free` and escalating on failure gets the $0 attempt without the caller having to
+predict which tasks it will finish.
+
+Two deliberate limits:
+
+- **Escalation only happens on a zero-edit failure.** Once the worker has written to
+  the tree, the next backend would start from a half-applied change nobody reviewed,
+  so the run stops and tells you to look at the tree instead.
+- **`--model` disables escalation.** A model id belongs to one backend, so carrying
+  it to another would 404. Pinning a model means you chose the tier too.
+
+Both attempts are written to the ledger: the failed one with `"ok": false` and
+`"escalated_to"`, the successful one with `"escalated_from"`. A tier showing 0 runs
+*and* 0 failed attempts was never routed to at all, which the ledger previously
+could not distinguish from a tier that was tried and died.
 
 ## Install
 
@@ -450,7 +491,7 @@ Tier A; otherwise it stays on Tier B.
 
 | Axis | Tier B (default, no Claude tokens) | Tier A (escalate, costs tokens) |
 |------|------------------------------------|---------------------------------|
-| **Complexity** | mechanical / boilerplate -> `delegate free`; substantial but specifiable, a whole module or a real refactor -> `delegate deepseek` | needs broad codebase judgment -> subagent `sonnet` / `opus` |
+| **Complexity** | anything specifiable -> `delegate` (defaults to `free`, escalates to `deepseek` on failure); force the paid tier with `delegate deepseek` when a task must not be retried | needs broad codebase judgment -> subagent `sonnet` / `opus` |
 | **Iteration depth** | verifiable in ~one shot (orchestrator runs verify once, commits) | long autonomous run-fail-edit loop, or needs a live service / Docker / the app running |
 | **Sensitivity** | ordinary code | security-sensitive, or full-context debugging (Tier A, or the orchestrator itself) |
 

@@ -24,23 +24,26 @@ Work to orchestrate: `$ARGUMENTS`
 
 Any single axis landing in the "escalate" column sends that task to Tier A. Otherwise Tier B.
 
-- **Complexity:** mechanical / boilerplate, or substantial-but-specifiable (a whole module or
-  a real refactor) -> Tier B (pick the backend below); needs broad codebase judgment ->
-  Tier A subagent (`sonnet` / `opus`).
+- **Complexity:** anything specifiable and diff-verifiable, from boilerplate up to a whole
+  module or a real refactor -> Tier B (do not pick a backend, see below); needs broad
+  codebase judgment -> Tier A subagent (`sonnet` / `opus`).
 - **Iteration depth:** verifiable in ~one shot (you run verify once and commit) -> Tier B; a
   long autonomous run-fail-edit loop, or needs a live service / Docker / the app running ->
   Tier A subagent.
 - **Sensitivity:** ordinary code -> Tier B; security-sensitive or full-context debugging ->
   Tier A, or handle it yourself.
 
-### Tier B backend: cheapest-that-fits
+### Tier B backend: let it default
 
-Once a task is Tier B, pick the **cheapest backend whose capability fits**, then escalate the
-*backend* (not the tier) if it fails. State the choice and why in one line before running.
+Once a task is Tier B, **do not pick a backend**: run `delegate "<task>"` and let the CLI
+default to `free` and escalate to `deepseek` itself. Measured on `bench/tasks.json`
+(2026-10-01), reviewing a `free` diff costs the same as reviewing a paid one, so `free` is
+the less reliable tier, not the weaker one, and hand-routing by difficulty is what left it
+unused. Name a backend only for the specific jobs below.
 
-- **`free` (OmniRoute, $0 local, unlimited):** default for **mechanical / boilerplate / bulk**
-  when its pool is healthy (`--model auto/coding`, or `auto/cheap` for high volume). Slow;
-  pool can be dry.
+- **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you (`--model
+  auto/coding`, or `auto/cheap` for high volume). Slow; the pool drains under sustained
+  load, which the automatic escalation now covers.
 - **`openrouter` ($0 `:free`, rate-limited):** the **free-remote fallback** when OmniRoute is
   dry, preferred over `nvidia` so nvidia's finite credits stay in reserve; and the **pin
   lever** for a specific fast/quality free model, one not on the nvidia account, or a
