@@ -46,6 +46,29 @@ echo "For the /delegate + /orchestrate commands and skills, install the plugin:"
 echo "  claude plugin marketplace add aayushpokhrel1/delegation-pipeline"
 echo "  claude plugin install delegation-pipeline"
 
+# If this checkout is a git repo, install the post-commit refresh hook. It is a
+# no-op unless this very directory is the plugin's marketplace source, so it is
+# safe to install on a machine that uses the GitHub marketplace instead.
+HOOK_SRC="$REPO_DIR/scripts/post-commit-refresh-plugin.sh"
+HOOK_GITDIR=$(git -C "$REPO_DIR" rev-parse --git-dir 2>/dev/null || true)
+if [ -n "$HOOK_GITDIR" ] && [ -f "$HOOK_SRC" ]; then
+  case "$HOOK_GITDIR" in
+    /*) ;;
+    *) HOOK_GITDIR="$REPO_DIR/$HOOK_GITDIR" ;;
+  esac
+  mkdir -p "$HOOK_GITDIR/hooks"
+  if [ -e "$HOOK_GITDIR/hooks/post-commit" ] \
+     && ! grep -q "post-commit-refresh-plugin" "$HOOK_GITDIR/hooks/post-commit" 2>/dev/null; then
+    echo "Note: $HOOK_GITDIR/hooks/post-commit already exists and is not ours; left alone."
+    echo "      To auto-refresh the installed plugin, chain in: $HOOK_SRC"
+  else
+    cp "$HOOK_SRC" "$HOOK_GITDIR/hooks/post-commit"
+    chmod +x "$HOOK_GITDIR/hooks/post-commit"
+    echo "Installed post-commit hook: reinstalls the plugin when skills/ commands/"
+    echo "  .claude-plugin/ change, so the installed copy cannot go stale."
+  fi
+fi
+
 echo
 echo "Done. Test it:"
 echo "  ~/.claude/bin/delegate free \"list the files here and summarize the project\""

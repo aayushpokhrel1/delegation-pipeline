@@ -201,12 +201,22 @@ claude plugin install delegation-pipeline
 Removing a marketplace uninstalls its plugins, so the `install` is required, not optional.
 
 **`claude plugin update` does not refresh a directory marketplace.** It compares the
-version in `.claude-plugin/plugin.json` and reports "already at the latest version
-(0.1.0)" however much the files changed. To pick up an edit, either bump that version or:
+version in `.claude-plugin/plugin.json` against the installed version and skips the copy
+when they match, reporting `updateOutcome: "up_to_date"` however much the files changed.
+The version string *is* the cache key: installs land in
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. So either bump the version, or
+sidestep version bookkeeping:
 
 ```
 claude plugin uninstall delegation-pipeline && claude plugin install delegation-pipeline
 ```
+
+`install.sh` / `install.ps1` wire [`scripts/post-commit-refresh-plugin.sh`](scripts/post-commit-refresh-plugin.sh)
+into `.git/hooks/post-commit` so that second form runs for you whenever a commit touches
+`skills/`, `commands/` or `.claude-plugin/`. A written reminder would rot the same way the
+pinned clone did, and these files are instructions: stale ones do not break, they steer.
+The hook no-ops unless this checkout is the marketplace source, so it is harmless on a
+machine installing from GitHub. `DELEGATE_SKIP_PLUGIN_REFRESH=1` disables it.
 
 Install copies your working tree, **not** `HEAD`: uncommitted edits and even gitignored
 paths (`__pycache__/`, `graphify-out/`) land in the installed copy. Convenient while
