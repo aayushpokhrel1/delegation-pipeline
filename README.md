@@ -26,6 +26,58 @@ tier per task. See [Backends](#backends).
 
 ![demo](assets/demo.gif)
 
+## What this sends, and where
+
+This tool's whole job is handing your code to a model that is not Claude, so be clear-eyed
+about what leaves the machine.
+
+**What is sent.** When you delegate a task, the worker sends the task text plus the contents
+of any file it reads or edits in the current repository to **the backend you selected**.
+There is no telemetry and no analytics: the author receives nothing, and no data is sent
+anywhere you did not point it.
+
+**One exception, stated plainly.** The worker has a `view_image` tool, and if you pass
+`--image <url>` or the model calls that tool with a URL, the worker issues a plain `GET` to
+**that URL**, which can be any host. It sends no credentials and no repository content, only
+a `User-Agent`, and the fetched image is then sent to your backend like any other input. The
+model can trigger this by itself mid-task, so if you do not want an untrusted task
+description able to cause an outbound request, do not delegate untrusted task text.
+
+**Where it goes**, per backend, all declared in
+[`config.example.json`](config.example.json) and overridable in `~/.claude/delegate.config.json`:
+
+| Backend | Endpoint | Whose machine |
+| --- | --- | --- |
+| `free` | `http://localhost:20128/v1` | A local OmniRoute gateway you run yourself (`npx omniroute`). It is a **router**: it forwards to upstream providers, so "local" describes the gateway, not the destination |
+| `deepseek` | `api.deepseek.com` | DeepSeek |
+| `kimi` | `api.moonshot.ai` | Moonshot |
+| `nvidia` | `integrate.api.nvidia.com` | NVIDIA |
+| `openrouter` | `openrouter.ai` | OpenRouter, which forwards to the model's provider |
+
+**Credentials.** API keys are read from the environment variables named in your config
+(`DEEPSEEK_API_KEY` and friends), or from `api_key` in `~/.claude/delegate.config.json` if you
+put one there. Each key is sent only to the provider it belongs to, as that provider's
+`Authorization` header. Keys are never logged, never written to the usage ledger, and never
+sent anywhere else.
+
+**What it writes outside the repository.** Two things, both under `~/.claude/`:
+
+- `~/.claude/bin/delegate`, the launcher, created at session start by
+  [`scripts/ensure_launcher.py`](scripts/ensure_launcher.py) (see [Install](#install)).
+- `~/.claude/delegate-usage.jsonl`, a local usage ledger of one line per run: timestamp,
+  backend, model, token counts, repository **name** (not path, not contents), and whether
+  verify and commit succeeded. It never leaves your machine, and `delegate --stats` reads it.
+  Delete the file to opt out; it is recreated on the next run.
+
+**What the worker model can and cannot do.** It can read, search, and edit files inside the
+current repository. It **cannot** run shell commands, use git, or touch anything outside that
+directory. `--verify` and `--commit` are run by the CLI harness on your behalf, never by the
+model, and `--commit` stages only the files the worker actually edited.
+
+**Opting out per repository.** Say "don't delegate this" in a session, or simply do not call
+`delegate`. Nothing runs on its own: every delegation is started by you or by Claude acting
+on your instructions.
+
 <!-- delegate-stats:start -->
 
 ### Measured impact
