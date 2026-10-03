@@ -17,6 +17,9 @@ Rules:
 | `bench/README.md` | What the benchmark measures, how to run it, and what its ratio does **not** prove |
 | `bench/RESULTS.md` | The last benchmark run. `REVIEW_RATIO` in `delegate.py` is derived from it, and a test asserts they agree, so it is generated, never hand-edited |
 | `skills/*/SKILL.md`, `commands/*.md` | What Claude is told about delegating. These ship as the plugin, so editing one changes behaviour in every project |
+| `PRIVACY.md` | What leaves the machine and where it goes. The directory listing's `privacyPolicyUrl` points here, so a reviewer reads it. It duplicates the README's "What this sends, and where" table on purpose; **change both or neither**, since the endpoint list is the part that rots |
+| `.claude-plugin/plugin.json` | The manifest, plus the directory listing fields (`icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`). `version` is the cache key: bump it or nobody receives the change |
+| `hooks/hooks.json`, `scripts/ensure_launcher.py` | Why a plugin-only install works. The hook writes `~/.claude/bin/delegate` pointing at the plugin's own copy, and deliberately leaves a launcher alone when it points at a checkout that still exists |
 | `CLAUDE.md` | This file |
 
 **The skills and commands are instructions, not documentation.** A stale one does not break,

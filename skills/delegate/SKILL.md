@@ -13,8 +13,11 @@ Python agent over any OpenAI-compatible endpoint. It can read, search, and edit 
 current repo. It **cannot** run shell or git, by design: you review the resulting `git diff`
 and commit.
 
-Requires the CLI installed once (`bash install.sh` or `./install.ps1` from the repo). See
-the [README](https://github.com/aayushpokhrel1/delegation-pipeline) for backends and keys.
+Installing this plugin is enough: a `SessionStart` hook writes the `~/.claude/bin/delegate`
+launcher pointing at the plugin's own copy. `install.sh` / `install.ps1` are only for working
+on a clone, where the launcher points at your checkout instead. A backend still needs setup,
+either a local OmniRoute gateway for `free` or an API key for a remote tier. See the
+[README](https://github.com/aayushpokhrel1/delegation-pipeline) for backends and keys.
 
 ## When to use
 

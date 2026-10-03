@@ -212,6 +212,12 @@ Two deliberate limits:
   so the run stops and tells you to look at the tree instead.
 - **`--model` disables escalation.** A model id belongs to one backend, so carrying
   it to another would 404. Pinning a model means you chose the tier too.
+- **A hop with no credential is not offered.** If `deepseek` has no key on this machine,
+  escalating to it could only ever fail, so the run does not try. It stops at `free` and
+  prints the three ways out: start the gateway, set any one key, or point `free` at another
+  OpenAI-compatible endpoint. Before this, a fresh install with no gateway and no keys died
+  with "Backend 'deepseek' needs an API key", telling a user who never asked for DeepSeek to
+  go and get a DeepSeek key.
 
 Both attempts are written to the ledger: the failed one with `"ok": false` and
 `"escalated_to"`, the successful one with `"escalated_from"`. A tier showing 0 runs
@@ -683,8 +689,9 @@ by the CLI harness (the caller), never by the worker model.
 ## Portability
 
 Everything the worker needs is one `delegate.py` file and the stdlib, so it runs on any
-device with Python 3.8+. Sync = clone this repo + run the installer. Real keys live in
-`~/.claude/delegate.config.json` (git-ignored), never in the repo.
+device with Python 3.8+. On a new machine, install the plugin and the launcher appears by
+itself; clone and run the installer only if you want it pointed at a checkout. Real keys live
+in your environment or in `~/.claude/delegate.config.json` (git-ignored), never in the repo.
 
 ## Related: save Claude tokens on graphify too
 
