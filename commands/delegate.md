@@ -1,7 +1,7 @@
 ---
 description: Hand a task to a free/cheap worker (defaults to free, escalates to deepseek on failure), then review its diff
 argument-hint: [free|nvidia|openrouter|deepseek|kimi (optional, defaults to free)] <task description>
-allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
+allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
 
 You are the orchestrator. Offload the task below to a cheap/free headless worker via the

@@ -2,9 +2,12 @@
   "name": "delegation-pipeline",
   "displayName": "Delegation Pipeline",
   "description": "Offload token-heavy grunt work from your paid Claude session to free/cheap models. Spend Claude tokens on thinking, not typing.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "keywords": ["delegation", "token-optimization", "code-review", "automation", "openai-compatible"],
   "repository": "https://github.com/aayushpokhrel1/delegation-pipeline",
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://github.com/aayushpokhrel1/delegation-pipeline#readme",
+  "supportUrl": "https://github.com/aayushpokhrel1/delegation-pipeline/issues",
   "author": {
     "name": "Aayush Pokhrel",
     "url": "https://github.com/aayushpokhrel1"

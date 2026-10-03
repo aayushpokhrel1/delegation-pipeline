@@ -1,7 +1,7 @@
 ---
 description: Run the combined-orchestration loop: route each task by complexity / iteration / sensitivity to the delegation pipeline (default) or a Claude subagent (escape hatch), with verify + commit
 argument-hint: <task, or plan/list of tasks to orchestrate>
-allowed-tools: Bash(~/.claude/bin/delegate:*), Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Bash(git show:*), Bash(git log:*), Read, Edit, Write, Agent
+allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Bash(git show:*), Bash(git log:*), Read, Edit, Write, Agent
 ---
 
 You are the **orchestrator**. Your job is to get the work below done while spending as little

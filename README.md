@@ -69,6 +69,14 @@ sent anywhere else.
   verify and commit succeeded. It never leaves your machine, and `delegate --stats` reads it.
   Delete the file to opt out; it is recreated on the next run.
 
+**The one download-and-run command, and it is yours to run.** The `free` backend needs an
+OmniRoute gateway, which is an npm package started with `npx --yes omniroute`. That command
+appears in this README, in `delegate.py`'s error message when no gateway is reachable, and in
+the optional helper scripts `scripts/start-omniroute.sh` / `.ps1`. Nothing in the plugin runs
+it for you: no hook, no skill, and no code path invokes it. You run it, or you skip the `free`
+backend entirely and use a remote one. `npx` fetches the package at run time, so what it
+executes is not part of this plugin and is not covered by its review.
+
 **What the worker model can and cannot do.** It can read, search, and edit files inside the
 current repository. It **cannot** run shell commands, use git, or touch anything outside that
 directory. `--verify` and `--commit` are run by the CLI harness on your behalf, never by the
