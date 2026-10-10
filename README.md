@@ -90,28 +90,29 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-10-02 from 51 delegated runs across 4 repos._
+_Generated 2026-10-10 from 73 delegated runs across 5 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 51 |
-| Tokens offloaded to workers | 27,147,998 (measured) |
-| Worker API calls | 998 |
-| Paid on the worker tier | $7.60 |
-| Claude tokens avoided | ~23,238,686 (estimated) |
-| Opus-equivalent value | ~$348.58 |
+| Runs delegated | 73 |
+| Tokens offloaded to workers | 39,665,084 (measured) |
+| Worker API calls | 1,373 |
+| Paid on the worker tier | $11.06 |
+| Claude tokens avoided | ~33,953,312 (estimated) |
+| Opus-equivalent value | ~$509.30 |
 
 By backend:
 
 ```
-deepseek  ████████████████████  100%   27,147,998 tokens
+deepseek  ████████████████████  100%   39,515,406 tokens
+free      ░░░░░░░░░░░░░░░░░░░░    0%   149,678 tokens
 ```
 
 By month:
 
 ```
 2026-09  ████████████████████   20,873,682 tokens
-2026-10  ██████░░░░░░░░░░░░░░   6,274,316 tokens
+2026-10  ██████████████████░░   18,791,402 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
