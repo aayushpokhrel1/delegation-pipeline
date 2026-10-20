@@ -51,6 +51,12 @@ The backend is optional and defaults to `free`, escalating once to `deepseek` on
 Both attempts land in the ledger, the failed one with `"ok": false` and `"escalated_to"`, so
 a dry tier leaves a trace instead of looking like a tier nobody routed to.
 
+**After an escalation the tree is clean, so review the diff normally.** A backend that dies
+mid-run has its edits rolled back before the fallback starts, so you are never reading half
+of one attempt plus all of another. The exception announces itself: if the rollback could not
+finish, the run stops without escalating and names the files it could not restore, and that
+is the one case where you inspect the tree by hand before doing anything else.
+
 **Give the run a long foreground timeout: up to 600000ms (10 min) on the Bash tool.** The
 free tier costs nothing but is slow, and it is now the default, so this applies to every
 delegation rather than only the ones that opt in. Measured on one small annotation task

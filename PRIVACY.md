@@ -68,6 +68,12 @@ Two files, both under `~/.claude/`, both local and never transmitted:
 The plugin also writes `~/.claude/bin/delegate`, a launcher script, at the start of a Claude
 Code session.
 
+Inside the repository you invoke it in, a **failed** run writes too: worker edits are
+all-or-nothing, so if the backend dies mid-run the tool restores the files it had changed
+from an in-memory snapshot of their original bytes, and deletes any file the run created.
+Those snapshots live in memory for the length of the run and are never written to disk or
+sent anywhere. Nothing outside that repository is touched.
+
 ## What the tool will not do
 
 The worker model can read, search, and edit files inside the repository you invoke it in. It

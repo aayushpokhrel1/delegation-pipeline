@@ -25,6 +25,12 @@ Exit codes: 0 success. 2 verify failed (output printed, nothing committed). 3 th
 made no edits, so --verify was NOT run: it would have tested the caller's untouched tree
 and passed, reporting success for work that never happened.
 
+Worker edits are all-or-nothing. Each file's bytes are snapshotted the first time a run is
+about to change it, and a backend that dies mid-run has every edit undone (and any file it
+created deleted) before the fallback backend is handed the task, so the fallback starts
+from the caller's own tree. If that rollback cannot finish, the run stops instead of
+escalating and names the files it could not restore.
+
 Backends are defined in ~/.claude/delegate.config.json (see config.example.json).
 Only the Python standard library is used, so this runs anywhere Python 3.8+ exists.
 """
@@ -305,11 +311,19 @@ def record_run(entry):
         return False
 
 
-def _attempt_entry(name, backend_cfg, err, started, escalated_to=None):
+def _attempt_entry(name, backend_cfg, err, started, escalated_to=None,
+                   rolled_back=0, rollback_failed=False):
     """A ledger row for a backend attempt that FAILED. Written so a dry tier leaves
     a trace: before this existed, a failed run wrote nothing, and "never routed
-    here" looked identical to "routed here and it died"."""
+    here" looked identical to "routed here and it died".
+
+    `edits` is what the attempt wrote and `rolled_back` is how much of that was
+    put back, so the pair records whether the failure left anything behind. Both
+    are counts, never file names.
+    """
     return {
+        "rolled_back": rolled_back,
+        "rollback_failed": rollback_failed,
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "backend": name,
         "model": backend_cfg.get("model"),
@@ -686,9 +700,90 @@ def tool_read_file(path):
     return data
 
 
+# --------------------------------------------------------------------------- #
+# Edit journal: make a worker's edits all-or-nothing
+# --------------------------------------------------------------------------- #
+
+# Original bytes of every file the worker has modified this run. Module-level for
+# the same reason ROOT is: the tool functions are plain functions dispatched from
+# run_tool with no context object to thread through.
+#
+# WHY: a backend that died mid-run used to leave the tree half-edited, and because
+# that state is unreviewable the run could not escalate to the fallback backend
+# either, so it just stopped and told you to go look. Measured over the first 150
+# `free` attempts, 20 failed and 6 of those had already written 1-4 files. Putting
+# the tree back makes those 6 escalate like any other failure.
+#
+# Bytes, not text: the originals must come back exactly, whatever their encoding
+# or line endings, and the tools write utf-8 text.
+_JOURNAL = None
+
+# A file we could not snapshot. Kept as a distinct value so rollback reports an
+# honest failure instead of counting it restored and claiming a clean tree.
+_UNREADABLE = object()
+
+
+def start_journal():
+    """Begin (or re-arm) recording of pre-edit file contents."""
+    global _JOURNAL
+    _JOURNAL = {}
+
+
+def journal_original(p):
+    """Snapshot `p`'s bytes the FIRST time this run is about to modify it.
+
+    Once per path, never on a later write to the same file: the value must be the
+    state from before the worker ran, so re-snapshotting would capture the
+    worker's own output and turn rollback into a no-op.
+    """
+    if _JOURNAL is None or p in _JOURNAL:
+        return
+    try:
+        with open(p, "rb") as f:
+            _JOURNAL[p] = f.read()
+    except FileNotFoundError:
+        _JOURNAL[p] = None  # did not exist, so rollback deletes it
+    except OSError as e:  # unreadable, locked, a device, ...
+        _JOURNAL[p] = _UNREADABLE
+        log(f"delegate: warning: cannot snapshot {p} for rollback ({e})")
+
+
+def rollback_journal():
+    """Undo every edit recorded since start_journal().
+
+    Returns (restored_count, failures). A non-empty `failures` means the tree is
+    NOT pristine, so the caller must not treat it as safe to retry on.
+    """
+    global _JOURNAL
+    if not _JOURNAL:
+        _JOURNAL = None
+        return 0, []
+    restored, failures = 0, []
+    for p, original in _JOURNAL.items():
+        try:
+            if original is _UNREADABLE:
+                failures.append(f"{p}: never snapshotted, left as the worker wrote it")
+                continue
+            if original is None:
+                if os.path.exists(p):
+                    os.remove(p)
+                # Any directory write_file created on the way is left behind. An
+                # empty directory is inert, and tracking them to prune would add
+                # state for no gain.
+            else:
+                with open(p, "wb") as f:
+                    f.write(original)
+            restored += 1
+        except OSError as e:
+            failures.append(f"{p}: {e}")
+    _JOURNAL = None
+    return restored, failures
+
+
 def tool_write_file(path, content):
     p = safe_path(path)
     os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    journal_original(p)
     with open(p, "w", encoding="utf-8", newline="") as f:
         f.write(content if content is not None else "")
     return f"Wrote {len(content or '')} chars to {path}"
@@ -709,6 +804,10 @@ def tool_edit_file(path, old_string, new_string, replace_all=False):
         return (f"old_string matches {count} times; it must be unique. "
                 f"Add surrounding context, or pass replace_all=true.")
     text = text.replace(old_string, new_string)
+    # Journal here, not at the top: every return above rejected the edit without
+    # touching the file, and journalling those would make rollback rewrite files
+    # the worker never changed.
+    journal_original(p)
     with open(p, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     return f"Edited {path} ({count} replacement{'s' if count != 1 else ''})."
@@ -1108,7 +1207,12 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None, edited_paths=
         try:
             msg = resp["choices"][0]["message"]
         except (KeyError, IndexError):
-            die(f"unexpected response: {json.dumps(resp)[:500]}")
+            # A malformed response is the backend failing, so raise rather than
+            # exit: this is the same mid-run death as a dropped connection and
+            # deserves the same rollback and escalation, which die() skipped.
+            err = BackendError(f"unexpected response: {json.dumps(resp)[:500]}")
+            err.edits, err.usage = edits, usage
+            raise err
 
         tool_calls = msg.get("tool_calls") or []
         if not tool_calls:
@@ -1342,6 +1446,9 @@ def main():
     used_backend, used_cfg = args.backend, backend
     escalated_from = None
     edited_paths = set()
+    # Arm the edit journal before the worker can write anything, so a mid-run
+    # backend death can be undone rather than left for the caller to untangle.
+    start_journal()
     while True:
         try:
             summary, usage = agent_loop(
@@ -1349,17 +1456,35 @@ def main():
                 edited_paths=edited_paths)
             break
         except BackendError as e:
-            nxt = fallback_for(used_backend, cfg, args.model) if not e.edits else None
+            # Put the tree back FIRST, before deciding anything. A partial edit
+            # set is unreviewable, and a pristine tree is exactly what makes
+            # escalating after edits safe: the next backend starts from the state
+            # the caller had, not from half of someone else's attempt.
+            restored, rb_failures = rollback_journal()
+            if restored:
+                log(f"delegate: rolled back {restored} file(s) written by the "
+                    f"failed {used_backend} attempt")
+                # A full rollback means none of the worker's edits survive, so
+                # these paths must not reach git_commit: staging a rolled-back
+                # file would commit whatever the caller already had uncommitted
+                # in it.
+                edited_paths.clear()
+            start_journal()  # re-arm for the next attempt
+
+            # Only escalate onto a tree we actually restored.
+            nxt = None if rb_failures else fallback_for(used_backend, cfg, args.model)
             record_run(_attempt_entry(used_backend, used_cfg, e, started,
-                                      escalated_to=nxt))
+                                      escalated_to=nxt, rolled_back=restored,
+                                      rollback_failed=bool(rb_failures)))
+            if rb_failures:
+                die(f"{used_backend} failed after {e.edits} edit(s) AND the rollback "
+                    f"could not finish, so the tree is in a mixed state and was not "
+                    f"escalated. Review it by hand:\n  "
+                    + "\n  ".join(rb_failures) + f"\nOriginal failure: {e}")
             if not nxt:
-                if e.edits:
-                    die(f"{used_backend} failed after {e.edits} edit(s), so it was not "
-                        f"escalated (the tree is half-edited; review it): {e}")
                 die(f"{used_backend} failed and no fallback is available: {e}"
                     + cold_start_help(cfg, used_backend))
-            log(f"delegate: {used_backend} failed with no edits made, escalating to "
-                f"{nxt}: {e}")
+            log(f"delegate: {used_backend} failed, escalating to {nxt}: {e}")
             escalated_from, used_backend = used_backend, nxt
             used_cfg = resolve_backend(cfg, nxt)
             used_cfg.setdefault("temperature", cfg.get("temperature"))

@@ -210,14 +210,23 @@ predict which tasks it will finish.
 
 Two deliberate limits:
 
-- **Escalation only happens on a zero-edit failure.** Once the worker has written to
-  the tree, the next backend would start from a half-applied change nobody reviewed,
-  so the run stops and tells you to look at the tree instead. Measured over the first
-  150 `free` attempts: 20 failed, 14 of them at zero edits (escalated cleanly, costing
-  nothing), and **6 after editing 1-4 files**, which is the case that hands you a
-  half-applied change. Roughly 4% of `free` attempts, so budget for it rather than
-  treating it as theoretical. Making the worker's edits atomic would remove it; nothing
-  does that today.
+- **A failed attempt is rolled back, then escalated.** The worker's edits are
+  all-or-nothing: `delegate` snapshots each file's bytes the first time a run is about
+  to change it, and if the backend dies mid-run it puts every one of them back
+  (deleting any file the run created) before handing the task to the fallback. So the
+  fallback always starts from the tree *you* had, never from half of someone else's
+  attempt.
+
+  This replaced an earlier rule where a failure after any edit refused to escalate at
+  all and told you to go inspect the tree. That was not a rare path: over the first 150
+  `free` attempts, 20 failed and **6 of those had already written 1-4 files**, about 4%
+  of attempts. Those 6 now escalate like any other failure.
+
+  If the rollback itself cannot finish (a file became unreadable or unwritable), the run
+  does **not** escalate, because the tree is then in a mixed state no backend should
+  build on. It names each file it could not restore and stops. The ledger records
+  `edits` alongside `rolled_back` so the pair tells you whether a failure left anything
+  behind.
 - **`--model` disables escalation.** A model id belongs to one backend, so carrying
   it to another would 404. Pinning a model means you chose the tier too.
 - **A hop with no credential is not offered.** If `deepseek` has no key on this machine,

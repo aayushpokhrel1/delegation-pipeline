@@ -681,17 +681,24 @@ def test_git_commit_with_no_paths_is_a_noop():
             delegate.ROOT = original_root
 
 
-def _run_main(argv, agent_result, verify_calls):
-    """Drive delegate.main() with a stubbed worker. Returns (exit_code, stdout)."""
+def _run_main(argv, agent_result, verify_calls, cfg=None):
+    """Drive delegate.main() with a stubbed worker. Returns (exit_code, stdout).
+
+    `agent_result` is the (summary, usage) tuple to return, or a callable taking
+    (*a, **k) for a stub that needs to act or fail. `cfg` replaces load_config.
+    """
     import contextlib
     import io
 
     saved = (sys.argv, delegate.agent_loop, delegate.run_verify,
-             delegate.record_run, delegate.LEDGER_PATH)
+             delegate.record_run, delegate.LEDGER_PATH, delegate.load_config)
     out = io.StringIO()
     try:
         sys.argv = argv
-        delegate.agent_loop = lambda *a, **k: agent_result
+        if cfg is not None:
+            delegate.load_config = lambda: cfg
+        delegate.agent_loop = (agent_result if callable(agent_result)
+                               else lambda *a, **k: agent_result)
         # Records that verify ran at all; the point of the test is that it must not.
         def _verify(cmd, timeout):
             verify_calls.append(cmd)
@@ -707,7 +714,105 @@ def _run_main(argv, agent_result, verify_calls):
         return code, out.getvalue()
     finally:
         (sys.argv, delegate.agent_loop, delegate.run_verify,
-         delegate.record_run, delegate.LEDGER_PATH) = saved
+         delegate.record_run, delegate.LEDGER_PATH, delegate.load_config) = saved
+
+
+def test_rollback_restores_a_modified_file():
+    delegate.ROOT = tempfile.mkdtemp()
+    target = os.path.join(delegate.ROOT, "keep.py")
+    with open(target, "w", encoding="utf-8") as f:
+        f.write("original\n")
+
+    delegate.start_journal()
+    delegate.tool_edit_file("keep.py", "original", "worker wrote this")
+    with open(target, encoding="utf-8") as f:
+        assert f.read() == "worker wrote this\n", "edit should have applied"
+
+    restored, failures = delegate.rollback_journal()
+    assert (restored, failures) == (1, []), (restored, failures)
+    with open(target, encoding="utf-8") as f:
+        assert f.read() == "original\n", "rollback must restore the original bytes"
+
+
+def test_rollback_deletes_a_file_the_worker_created():
+    delegate.ROOT = tempfile.mkdtemp()
+    delegate.start_journal()
+    delegate.tool_write_file("new/made_up.py", "brand new\n")
+    created = os.path.join(delegate.ROOT, "new", "made_up.py")
+    assert os.path.exists(created)
+
+    restored, failures = delegate.rollback_journal()
+    assert (restored, failures) == (1, []), (restored, failures)
+    assert not os.path.exists(created), "a file that did not exist must be removed"
+
+
+def test_journal_keeps_the_pre_run_state_not_the_last_write():
+    """The snapshot must be taken once. Re-snapshotting on each write would
+    capture the worker's own output and make rollback a no-op."""
+    delegate.ROOT = tempfile.mkdtemp()
+    target = os.path.join(delegate.ROOT, "twice.txt")
+    with open(target, "w", encoding="utf-8") as f:
+        f.write("pristine")
+
+    delegate.start_journal()
+    delegate.tool_write_file("twice.txt", "first pass")
+    delegate.tool_write_file("twice.txt", "second pass")
+    delegate.rollback_journal()
+    with open(target, encoding="utf-8") as f:
+        assert f.read() == "pristine", "must go back before the FIRST write"
+
+
+def test_rollback_reports_a_failure_rather_than_claiming_a_clean_tree():
+    """An unrestorable file must surface, because main() only escalates onto a
+    tree it actually restored."""
+    delegate.ROOT = tempfile.mkdtemp()
+    delegate.start_journal()
+    delegate._JOURNAL[os.path.join(delegate.ROOT, "locked.bin")] = delegate._UNREADABLE
+
+    restored, failures = delegate.rollback_journal()
+    assert restored == 0, restored
+    assert len(failures) == 1 and "never snapshotted" in failures[0], failures
+
+
+def test_a_failure_after_edits_rolls_back_and_then_escalates():
+    """The headline change. A backend dying mid-run used to leave a half-edited
+    tree and refuse to escalate; 6 of the first 20 free failures were this. Now
+    the tree goes back and the fallback runs from the caller's own state."""
+    repo = tempfile.mkdtemp()
+    with open(os.path.join(repo, "src.py"), "w", encoding="utf-8") as f:
+        f.write("before\n")
+    # Both local so resolve_backend does not demand an API key.
+    cfg = {"backends": {"free": {"base_url": "http://localhost:20128/v1",
+                                 "model": "auto/coding"},
+                        "deepseek": {"base_url": "http://localhost:1/v1",
+                                     "model": "deepseek-chat"}},
+           "max_steps": 5, "temperature": 0.2, "max_tokens": 64,
+           "request_timeout": 5}
+    seen = []
+
+    def stub(backend, task, *a, **k):
+        seen.append(backend["model"])
+        if len(seen) == 1:
+            # First attempt really writes through the tools, then dies.
+            delegate.tool_write_file("src.py", "half-finished edit\n")
+            delegate.tool_write_file("stray.py", "should not survive\n")
+            err = delegate.BackendError("HTTP 502: pool drained")
+            err.edits, err.usage = 2, {"prompt_tokens": 1, "completion_tokens": 1,
+                                       "total_tokens": 2, "calls": 1, "edits": 2}
+            raise err
+        return ("SUMMARY: did it properly",
+                {"prompt_tokens": 9, "completion_tokens": 9, "total_tokens": 18,
+                 "calls": 2, "edits": 1})
+
+    code, out = _run_main(["delegate.py", "free", "do it", "--dir", repo],
+                          stub, [], cfg=cfg)
+
+    assert code == 0, f"expected the escalated run to succeed, got {code}: {out}"
+    assert seen == ["auto/coding", "deepseek-chat"], f"should have escalated: {seen}"
+    with open(os.path.join(repo, "src.py"), encoding="utf-8") as f:
+        assert f.read() == "before\n", "the failed attempt's edit must be undone"
+    assert not os.path.exists(os.path.join(repo, "stray.py")), \
+        "a file created by the failed attempt must not survive"
 
 
 def test_verify_is_not_claimed_when_the_worker_edited_nothing():
