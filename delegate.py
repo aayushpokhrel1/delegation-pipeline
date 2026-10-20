@@ -10,16 +10,20 @@ The CLI harness can, but only via the caller-provided --verify and --commit flag
 it did to stdout; step logs go to stderr.
 
 Usage:
-    delegate.py <backend> "<task>"
-    delegate.py free "Add docstrings to every function in src/utils.py"
+    delegate.py "<task>"                      # backend defaults to free, falls back
+    delegate.py <backend> "<task>"            # name one to pin the tier
+    delegate.py "Add docstrings to every function in src/utils.py"
     delegate.py deepseek "Convert callbacks to async/await in api/client.py" --dir .
-    delegate.py free --verify "npm test" --commit "feat: x" "Implement x per spec"
+    delegate.py --verify "npm test" --commit "feat: x" "Implement x per spec"
 
---verify runs the given command after the worker edits; a non-zero exit prints the
-command output and exits 2 without committing. --commit stages and commits only the
-files the worker edited, and only when verify passed (or no --verify was set). This
+--verify runs the given command after the worker edits. --commit stages and commits only
+the files the worker edited, and only when verify passed (or no --verify was set). This
 lets the orchestrator hand off a task and get back a tested, committed result at no Claude
 token cost, while the worker model itself still never runs shell or git.
+
+Exit codes: 0 success. 2 verify failed (output printed, nothing committed). 3 the worker
+made no edits, so --verify was NOT run: it would have tested the caller's untouched tree
+and passed, reporting success for work that never happened.
 
 Backends are defined in ~/.claude/delegate.config.json (see config.example.json).
 Only the Python standard library is used, so this runs anywhere Python 3.8+ exists.
@@ -1081,7 +1085,13 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None, edited_paths=
             f"TASK:\n{task}\n\nWorking directory: {ROOT}", image_uris)},
     ]
     edits = 0
-    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0}
+    # "edits" rides along in usage so the caller gets the authoritative count without
+    # changing this function's return arity. Do NOT substitute len(edited_paths) for
+    # it: that set is best-effort telemetry whose path resolution is wrapped in a
+    # swallowing except, so it can under-count, and main() decides whether to claim
+    # success from this number.
+    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+             "calls": 0, "edits": 0}
     for step in range(1, max_steps + 1):
         try:
             resp = chat_completion(backend, messages, timeout)
@@ -1138,6 +1148,7 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None, edited_paths=
                     ("no change", "not a file", "old_string", "bad ")
                 ):
                     edits += 1
+                    usage["edits"] = edits
                     if edited_paths is not None:
                         raw_path = args.get("path")
                         if isinstance(raw_path, str) and raw_path:
@@ -1382,10 +1393,30 @@ def main():
         "completion": usage["completion_tokens"],
         "total": usage["total_tokens"],
         "calls": usage["calls"],
+        "edits": usage.get("edits", 0),
         "elapsed_s": round(time.monotonic() - started, 1),
         "verify": None,
         "commit": None,
     }
+
+    # A worker that edited nothing has not done the task, so --verify must not be
+    # allowed to say otherwise. Running it here would test the tree the caller
+    # already had: on a repo whose suite was green to begin with it passes, and the
+    # run prints "VERIFY PASSED" and exits 0 for work that never happened. The
+    # separate "nothing to commit" line is not enough, because the verify line is
+    # the one a caller reads (bench/run_bench.py greps stdout for VERIFY PASSED).
+    # Exit 3, not 2, so a caller can tell "did nothing" from "did it wrong".
+    if args.verify and not usage.get("edits"):
+        log("delegate: verify SKIPPED: the worker made no edits, so there is "
+            "nothing to verify")
+        entry["verify"] = "skipped: no edits"
+        record_run(entry)
+        print(summary)
+        print(f"\n--- NO EDITS MADE: {args.verify} was not run ---")
+        print("The worker finished without changing any file. Its summary above says "
+              "what it did instead;\nre-read the brief for a task it could not act on, "
+              "or a change that was already present.")
+        sys.exit(3)
 
     verify_ok = True
     if args.verify:

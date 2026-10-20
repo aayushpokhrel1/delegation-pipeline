@@ -681,6 +681,69 @@ def test_git_commit_with_no_paths_is_a_noop():
             delegate.ROOT = original_root
 
 
+def _run_main(argv, agent_result, verify_calls):
+    """Drive delegate.main() with a stubbed worker. Returns (exit_code, stdout)."""
+    import contextlib
+    import io
+
+    saved = (sys.argv, delegate.agent_loop, delegate.run_verify,
+             delegate.record_run, delegate.LEDGER_PATH)
+    out = io.StringIO()
+    try:
+        sys.argv = argv
+        delegate.agent_loop = lambda *a, **k: agent_result
+        # Records that verify ran at all; the point of the test is that it must not.
+        def _verify(cmd, timeout):
+            verify_calls.append(cmd)
+            return True, ""
+        delegate.run_verify = _verify
+        delegate.record_run = lambda entry: True
+        code = 0
+        try:
+            with contextlib.redirect_stdout(out):
+                delegate.main()
+        except SystemExit as e:
+            code = e.code or 0
+        return code, out.getvalue()
+    finally:
+        (sys.argv, delegate.agent_loop, delegate.run_verify,
+         delegate.record_run, delegate.LEDGER_PATH) = saved
+
+
+def test_verify_is_not_claimed_when_the_worker_edited_nothing():
+    """A zero-edit run used to run --verify against the caller's untouched tree,
+    pass, print VERIFY PASSED and exit 0 -- reporting success for work that never
+    happened. Verify must be skipped, said so distinctly, and exit non-zero."""
+    repo = tempfile.mkdtemp()
+    calls = []
+    usage = {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2,
+             "calls": 1, "edits": 0}
+    code, out = _run_main(
+        ["delegate.py", "deepseek", "do nothing", "--dir", repo,
+         "--verify", "exit 0"],
+        ("SUMMARY: nothing needed changing", usage), calls)
+
+    assert code == 3, f"expected exit 3 for a zero-edit run, got {code}"
+    assert calls == [], f"verify must not run with no edits, but ran: {calls}"
+    assert "NO EDITS MADE" in out, out
+    assert "VERIFY PASSED" not in out, out
+
+
+def test_verify_still_runs_when_the_worker_edited_something():
+    """The guard must not swallow the normal path: one edit and verify runs."""
+    repo = tempfile.mkdtemp()
+    calls = []
+    usage = {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2,
+             "calls": 1, "edits": 1}
+    code, out = _run_main(
+        ["delegate.py", "deepseek", "do it", "--dir", repo, "--verify", "exit 0"],
+        ("SUMMARY: edited one file", usage), calls)
+
+    assert code == 0, f"expected success, got {code}: {out}"
+    assert calls == ["exit 0"], f"verify should have run once, got {calls}"
+    assert "VERIFY PASSED" in out, out
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
