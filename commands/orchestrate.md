@@ -75,19 +75,25 @@ description, which is why one-liners and edits smaller than their own spec stay 
    yourself, cheaply. Save it to `brief.md` (or a per-task file) so the review step can cite it.
 2. **Check the tree.** `git status --short`. If there are unrelated uncommitted changes, note
    them so the worker's diff stays attributable (offer to stash, do not stash without asking).
-3. **Route and run.** Hand off with verify + commit so you get back a tested, committed result:
+3. **Run it.** Name no backend: the CLI defaults to `free` and falls back to `deepseek` by
+   itself, so there is no tier to route. Hand off with verify + commit so you get back a
+   tested, committed result:
    ```bash
-   ~/.claude/bin/delegate <free|openrouter|nvidia|deepseek> [--model <id>] \
+   ~/.claude/bin/delegate \
      --verify "<test or typecheck command>" \
      --commit "<clear message>, per brief" \
      "<the full brief>"
    ```
-   A `free` worker can run for minutes, give it a long foreground timeout (up to ~600000ms)
+   The free tier is slow and it is now the default, so give every delegation a long
+   foreground timeout (up to ~600000ms)
    so it finishes in the foreground. On Windows, `--verify` runs through `cmd.exe`: pass one
    command, not a bash `&&` / `;` chain.
 4. **On red.** A failed verify exits 2 and commits nothing, printing the command output. Read
    that output and either **re-delegate** with the failure folded in as a sharper spec, or
    **escalate** that task to a Tier A subagent (it hit the iteration-depth axis).
+   **Exit 3 is different: the worker made no edits and verify never ran.** Nothing is wrong
+   with the code, so do not fold a test failure into the spec. Re-read the brief for
+   something it could not act on, or a change that was already present.
 5. **Review (Tier B).** Have a second worker review the committed diff against the brief:
    ```bash
    git show HEAD > review.diff

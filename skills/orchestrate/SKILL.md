@@ -76,11 +76,14 @@ saves tokens when the work is bulkier than its description, so one-liners stay i
    values. Save to `brief.md` so review can cite it. The worker has no conversation context.
 2. **Route and run** with verify + commit, so you get back a tested, committed result:
    ```
-   ~/.claude/bin/delegate <free|openrouter|nvidia|deepseek> --verify "<test/typecheck cmd>" --commit "<msg>, per brief" "<brief>"
+   ~/.claude/bin/delegate --verify "<test/typecheck cmd>" --commit "<msg>, per brief" "<brief>"
    ```
+   Name no backend: it defaults to `free` and falls back to `deepseek` by itself.
    `--verify` runs after editing; a non-zero exit prints output and exits 2 without
-   committing. `--commit` fires only on green. On Windows `--verify` runs through `cmd.exe`,
-   so pass one command, not a `&&` / `;` chain.
+   committing. **Exit 3 means the worker edited nothing**, so verify was not run at all:
+   that is a brief it could not act on, not a test failure. `--commit` fires only on green.
+   On Windows `--verify` runs through `cmd.exe`, so pass one command, not a `&&` / `;` chain.
+   Allow minutes: the free tier is slow and it is the default.
 3. **On red** (exit 2, no commit): read the printed output and either re-delegate with the
    failure folded in as a sharper spec, or escalate that task to a Tier A subagent.
 4. **Review (Tier B):** `git show HEAD > review.diff`, then

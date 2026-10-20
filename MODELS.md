@@ -107,40 +107,37 @@ NVIDIA account.
 
 ## How Opus should decide
 
-For each delegated task, Opus (cheaply, in-session) sizes it up:
-- Trivial/mechanical + huge volume -> `free --model auto/cheap`, or
-  `nvidia --model nvidia/nemotron-3-nano-30b-a3b` if free is dry.
-- Code-shaped -> `free --model auto/coding`, or `nvidia` default
-  (`nvidia/nemotron-3-super-120b-a12b`) if free is dry.
-- Needs care but not paid-tier -> `nvidia --model nvidia/nemotron-3-super-120b-a12b`.
-- Reliability critical -> `deepseek`.
+**There is no per-task sizing-up to do, and this file used to describe one here.** The CLI
+defaults to `free` and falls back to `deepseek` on its own, so the normal path is
+`delegate "<task>"` with no backend and no `--model`. Write the tight spec, run the worker,
+review the diff.
 
-Then it writes the tight spec, runs the worker, and reviews the diff as usual.
+The pins below are for a specific capability you have a reason to want:
+- Huge volume, where even a free run's latency adds up -> `--model auto/cheap`.
+- A stronger free model than OmniRoute's pool gives -> `nvidia --model
+  nvidia/nemotron-3-super-120b-a12b`.
+- Vision -> `openrouter` with a `-vl:free` model and `--image`.
+- The task must not be retried from scratch -> `deepseek`.
+
+Remember that any `--model` pin **disables the automatic fallback**, because a model id
+belongs to one backend. Pinning means you have taken responsibility for the tier.
 
 ## Orchestration defaults (verify + commit)
 
-Under combined orchestration (see the README's **Combined Orchestration** section), the tier
-defaults are:
+Under combined orchestration, implementation and review both go to `delegate "<task>"` with
+no backend named. A review worker reads the diff and the brief and reports spec compliance
+and quality for zero Claude tokens.
 
-- **Mechanical / boilerplate** -> `free` (`auto/coding`, or `auto/cheap` for bulk).
-- **Substantial but specifiable** (a whole module, a real refactor) -> `deepseek`, which is
-  roughly Sonnet-class for coding.
-- **Review** -> `deepseek` too. A review worker reads the diff and the brief and reports
-  spec compliance and quality, for zero Claude tokens.
-
-`--verify "<cmd>"` and `--commit "<msg>"` make a delegated task self-contained. The worker
-edits, then the CLI runs the verify command; a non-zero exit prints the output and exits 2
-without committing, and `--commit` only fires when verify passed (or no `--verify` was set).
-So the orchestrator hands off a brief and gets back a **tested, committed** result without
-spending Claude tokens on the test-and-commit cycle:
+`--verify` and `--commit` make a delegated task self-contained:
 
 ```bash
-~/.claude/bin/delegate deepseek \
+~/.claude/bin/delegate \
   --verify "npm test" \
   --commit "feat: add token refresh, per brief" \
   "<the full self-contained brief>"
 ```
 
-The worker **model** still never runs shell or git. Only the caller-provided `--verify` and
-`--commit` flags run commands, so the no-shell / no-git trust boundary stays intact. On
-Windows, `--verify` runs through `cmd.exe`: pass one command, not a bash `&&` / `;` chain.
+**The flags' full contract, including the exit codes, lives in the README's "The
+verify/commit flow".** It used to be restated here in full and the copy went stale: it
+still described exit 2 as the only failure after exit 3 (worker made no edits, verify not
+run) existed. One home, so this file keeps the example and not the rules.

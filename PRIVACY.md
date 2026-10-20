@@ -58,10 +58,12 @@ Two files, both under `~/.claude/`, both local and never transmitted:
 - **`~/.claude/delegate.config.json`** holds your backend configuration, including any API key
   you choose to put there rather than in your environment.
 - **`~/.claude/delegate-usage.jsonl`** is a usage ledger with one line per run: timestamp,
-  backend, model, token counts, elapsed time, the repository's **directory name** (not its
-  path and not its contents), and whether verify and commit succeeded. It exists so
-  `delegate --stats` can show you what you have spent. Delete the file at any time to clear
-  it; it is recreated on the next run.
+  backend, model, token counts, how many files were edited (a count, never the names or the
+  contents), elapsed time, the repository's **directory name** (not its path and not its
+  contents), and whether verify and commit succeeded. A run that failed outright adds a line
+  marked `"ok": false` carrying the backend's error text, so a provider's own message can
+  appear here. It exists so `delegate --stats` can show you what you have spent. Delete the
+  file at any time to clear it; it is recreated on the next run.
 
 The plugin also writes `~/.claude/bin/delegate`, a launcher script, at the start of a Claude
 Code session.

@@ -90,29 +90,29 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-10-19 from 120 delegated runs across 5 repos._
+_Generated 2026-10-20 from 130 delegated runs across 5 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 120 |
-| Tokens offloaded to workers | 63,277,993 (measured) |
-| Worker API calls | 2,116 |
-| Paid on the worker tier | $17.59 |
-| Claude tokens avoided | ~54,165,962 (estimated) |
-| Opus-equivalent value | ~$812.49 |
+| Runs delegated | 130 |
+| Tokens offloaded to workers | 68,570,336 (measured) |
+| Worker API calls | 2,296 |
+| Paid on the worker tier | $19.07 |
+| Claude tokens avoided | ~58,696,208 (estimated) |
+| Opus-equivalent value | ~$880.44 |
 
 By backend:
 
 ```
-deepseek  ████████████████████   99%   62,818,941 tokens
+deepseek  ████████████████████   99%   68,111,284 tokens
 free      ░░░░░░░░░░░░░░░░░░░░    1%   459,052 tokens
 ```
 
 By month:
 
 ```
-2026-09  ██████████░░░░░░░░░░   20,873,682 tokens
-2026-10  ████████████████████   42,404,311 tokens
+2026-09  █████████░░░░░░░░░░░   20,873,682 tokens
+2026-10  ████████████████████   47,696,654 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
@@ -201,8 +201,10 @@ delegate: free failed with no edits made, escalating to deepseek: ...
 Why it works this way, measured on `bench/tasks.json` on 2026-10-01: reviewing a
 `free` worker's diff costs the same as reviewing a paid one (85.4% vs 85.6% median
 savings), so `free` is not the lower-quality tier, only the less reliable one. It
-completed 5 of 9 tasks run back-to-back, while the 4 that failed all passed when
-retried alone, because the OmniRoute pool drains under sustained load. Defaulting to
+completed 5 of 9 tasks run back-to-back; of the 4 that failed, 3 passed when retried
+alone and the 4th never reached a model at all (a gateway 502 after its retries), so
+8 of 9 are confirmed and none failed on capability. The OmniRoute pool drains under
+sustained load. Defaulting to
 `free` and escalating on failure gets the $0 attempt without the caller having to
 predict which tasks it will finish.
 
@@ -210,7 +212,12 @@ Two deliberate limits:
 
 - **Escalation only happens on a zero-edit failure.** Once the worker has written to
   the tree, the next backend would start from a half-applied change nobody reviewed,
-  so the run stops and tells you to look at the tree instead.
+  so the run stops and tells you to look at the tree instead. Measured over the first
+  150 `free` attempts: 20 failed, 14 of them at zero edits (escalated cleanly, costing
+  nothing), and **6 after editing 1-4 files**, which is the case that hands you a
+  half-applied change. Roughly 4% of `free` attempts, so budget for it rather than
+  treating it as theoretical. Making the worker's edits atomic would remove it; nothing
+  does that today.
 - **`--model` disables escalation.** A model id belongs to one backend, so carrying
   it to another would 404. Pinning a model means you chose the tier too.
 - **A hop with no credential is not offered.** If `deepseek` has no key on this machine,
@@ -651,12 +658,27 @@ work is bulkier than its description, which is why one-liners stay in-session.
 
 ### The verify/commit flow
 
-`--verify "<cmd>"` runs the command after the worker finishes editing. A non-zero exit prints
-the output and exits 2 without committing. `--commit "<msg>"` stages and commits only the
-files the worker edited, but only when verify passed (or no `--verify` was given). Together
-they make a delegated task self-contained: the orchestrator hands off a brief and gets back a
-tested, committed result,
-without babysitting the test-and-commit cycle and without spending Claude tokens on it.
+`--verify "<cmd>"` runs the command after the worker finishes editing. `--commit "<msg>"`
+stages and commits only the files the worker edited, but only when verify passed (or no
+`--verify` was given). Together they make a delegated task self-contained: the orchestrator
+hands off a brief and gets back a tested, committed result, without babysitting the
+test-and-commit cycle and without spending Claude tokens on it.
+
+Exit codes, which are the contract a caller should read:
+
+| Code | Meaning |
+|---|---|
+| `0` | Done. Verify passed if it was given. |
+| `2` | **Verify failed.** The command output is printed and nothing is committed. |
+| `3` | **The worker made no edits, so verify was not run.** |
+
+Exit 3 exists because the alternative is a lie. With zero edits, `--verify` would run against
+the tree the caller already had: on a repo whose suite was green to begin with it passes, and
+the run prints `VERIFY PASSED` and exits 0 for work that never happened. "Nothing to commit"
+was reported separately, but the verify line is the one a caller reads, and
+`bench/run_bench.py` greps stdout for `VERIFY PASSED` precisely that way. A zero-edit run now
+says `NO EDITS MADE` and exits 3, so "did nothing" is distinguishable from "did it wrong".
+Treat it as a brief the worker could not act on, or a change that was already present.
 
 ```bash
 # mechanical, free tier, verified and committed in one shot

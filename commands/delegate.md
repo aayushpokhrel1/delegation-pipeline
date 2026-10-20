@@ -67,6 +67,7 @@ those in-session. If `delegate` errors that a backend needs a key or that OmniRo
 running (for `free`), relay the fix instead of retrying blindly.
 
 To get a tested, committed result back in one shot, add `--verify "<cmd>" --commit "<msg>"`:
-the CLI runs the command after the worker edits and commits only on a zero exit (a non-zero
-exit exits 2 and commits nothing). The worker model still never runs shell or git. For
+the CLI runs the command after the worker edits and commits only on a zero exit (a failing
+verify exits 2 and commits nothing; exit 3 means the worker edited nothing, so verify was
+never run and the task simply did not happen). The worker model still never runs shell or git. For
 routing a whole plan across the delegation pipeline and Claude subagents, use `/orchestrate`.
