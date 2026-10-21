@@ -54,14 +54,34 @@ hundreds of live ones, so the fix is the model name, not the provider keys.
 What each provider actually did, tested with a tool definition attached, because the worker
 edits through function calls and a model that cannot tool-call is useless here:
 
+`/api/providers` on the gateway is the authoritative list of what you can actually reach, and
+it says **4 connections, 3 active**: `groq`, `mistral`, `openrouter`, plus `cerebras`
+configured but `isActive: false`. Everything else in the 1,542-id catalog (`aihorde`, `dva`,
+`no-think`, `oc`, ...) is a keyless community pool you hold no connection for, which is why
+the router's attempts at it come back `exhausted_connection:noauth`. Check that endpoint
+before concluding anything about a model id.
+
 | Model | Result |
 | --- | --- |
-| `mistral/codestral-latest`, `mistral/codestral-2508` | **Work.** Tool calls fine |
+| `mistral/codestral-latest`, `mistral/codestral-2508` | **Work.** Tool calls fine. The current `free` default |
+| `openrouter/nvidia/nemotron-3.5-lightning:free` | **Works** |
+| `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` | **Works.** Much bigger model, for a task worth the wait |
+| `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | **Works** |
 | `mistral/devstral-latest`, `devstral-medium-latest` | `429 Rate limit exceeded`, persistently |
 | `mistral/mistral-large-latest` | `403 not available in your subscription` |
 | `groq/*` | `not available in the active live catalog`, and a Cloudflare `403` |
-| `openrouter/*` | `402 Insufficient credits. This account never purchased credits` |
+| `openrouter/*` **paid** ids | `402 Insufficient credits. This account never purchased credits` |
+| some `:free` ids (`...content-safety:free`, `...super-120b-a12b:free`) | `404 No endpoints found` |
 | `oc/*` | `410` deprecated, or `403` gated |
+
+So the free tier has **redundancy, not a single point of failure**: two providers and several
+working ids. Only 17 of OpenRouter's 954 ids carry the `:free` suffix, and those are the only
+OpenRouter ones reachable without credits; they are also rate-limited (~50/day) and slow, so
+they suit a one-off quality run rather than volume. `codestral` is the default because it is
+a code model and not day-capped.
+
+**Enabling the `cerebras` connection would add another**, and it is already keyed and merely
+switched off in the dashboard.
 
 So `free` works today with `"model": "mistral/codestral-latest"`. Verified end to end: a real
 delegation annotated a module in 3 calls and passed its test, and a second one fixed a
