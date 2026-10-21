@@ -38,16 +38,43 @@ gateway was serving 1,560 ids (38 of them `auto/*` routes) on 2026-10-02. Run th
 If a route keeps 403/429-ing, the keyless pool is exhausted, add provider keys in the
 OmniRoute dashboard (you have Groq/Cerebras/Gemini/Mistral/OpenRouter) or switch to `nvidia`.
 
-**A healthy gateway does not mean a healthy pool, and the two fail differently.** On
-2026-10-21, with the gateway up and answering, every coding route failed: `auto/coding`,
-`auto/coding:reliable`, `auto/coding:fast`, `auto/best-coding` and `auto/smart` all returned
-502s naming `oc/*` (OpenCode) upstreams that were either deprecated (`410 Model ... has been
-deprecated`) or gated (`403 OpenCode's free tier can only be used from within OpenCode`).
-Picking a different `auto/*` alias does not help when every alias resolves into the same dead
-provider: the aliases are a preference order over one pool, not separate pools. The fix is at
-the pool, by adding working provider keys at
-`http://localhost:20128/dashboard/api-manager`, not at the route name. Until then `free`
-fails fast and the automatic escalation to `deepseek` carries the work.
+### The `auto/*` aliases route into dead OpenCode models. Pin a concrete one.
+
+Measured 2026-10-21, with the gateway up and healthy. Every coding alias failed:
+`auto/coding`, `auto/coding:reliable`, `auto/coding:fast`, `auto/best-coding` and
+`auto/smart` all 502'd naming `oc/*` (OpenCode) upstreams, either deprecated
+(`410 Model ... has been deprecated`) or gated (`403 OpenCode's free tier can only be used
+from within OpenCode`).
+
+**This is not an empty pool, which is what it looks like and what this file said at first.**
+The gateway was serving 1,542 model ids: 954 `openrouter/`, 148 `aihorde/`, 55 `mistral/`,
+18 `groq/` and just 8 `oc/`. The router was preferring those 8 dead OpenCode models over
+hundreds of live ones, so the fix is the model name, not the provider keys.
+
+What each provider actually did, tested with a tool definition attached, because the worker
+edits through function calls and a model that cannot tool-call is useless here:
+
+| Model | Result |
+| --- | --- |
+| `mistral/codestral-latest`, `mistral/codestral-2508` | **Work.** Tool calls fine |
+| `mistral/devstral-latest`, `devstral-medium-latest` | `429 Rate limit exceeded`, persistently |
+| `mistral/mistral-large-latest` | `403 not available in your subscription` |
+| `groq/*` | `not available in the active live catalog`, and a Cloudflare `403` |
+| `openrouter/*` | `402 Insufficient credits. This account never purchased credits` |
+| `oc/*` | `410` deprecated, or `403` gated |
+
+So `free` works today with `"model": "mistral/codestral-latest"`. Verified end to end: a real
+delegation annotated a module in 3 calls and passed its test, and a second one fixed a
+median function and passed, both at $0.
+
+**Set it in `~/.claude/delegate.config.json`, NOT with `--model`.** A config default keeps the
+automatic `free` -> `deepseek` escalation; `--model` deliberately disables it, because a model
+id belongs to one backend. Same string, opposite behaviour on failure.
+
+One caveat worth knowing before relying on it: the escalation covers a backend being
+*unreachable*, not a worker being *wrong*. A failed `--verify` exits 2 and does not escalate,
+so a weaker free model shows up as more exit-2 runs for you to re-delegate, not as automatic
+fallback.
 A 502 naming several providers at once (`Model is unavailable`, `exhausted_connection`) means
 the pool itself has run dry rather than one route: that is the failure the automatic
 `free` -> `deepseek` escalation exists to absorb.
