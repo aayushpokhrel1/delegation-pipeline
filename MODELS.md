@@ -17,26 +17,35 @@ without editing, so avoid them for edit tasks. When unsure, fall back to the def
 
 ## free backend (OmniRoute): task -> route
 
-For `free`, prefer an **`auto/*` router alias** over a concrete model id. The router fails
-over across your healthy providers (Groq, Cerebras, Gemini, Mistral, OpenRouter, plus the
-keyless defaults), so if one is rate-limited it silently tries the next. Pinning a specific
-model id routes to only that one provider, so it fails instead of falling over, use a
-concrete id only when you deliberately want that provider.
+**Pin a concrete model id. Do not use an `auto/*` alias.** This file used to say the
+opposite, on the reasonable-sounding theory that the router fails over across healthy
+providers while a pinned id commits you to one. The theory is right and the premise is not:
+there is almost nothing healthy for it to fail over to, so in practice an alias fails while
+a pinned id works. Measured, repeatedly, on 2026-10-21.
 
-| Task shape                                  | Route (`--model ...`)   |
-|---------------------------------------------|-------------------------|
-| **Code edits / refactors** (default)        | `auto/coding`           |
-| **Trivial / high-volume** bulk edits        | `auto/cheap`            |
-| **Latency-sensitive**, keep it moving       | `auto/fast`             |
-| **Force only no-cost routes**               | `auto/coding:free`      |
-| **Prefer the most reliable free route**     | `auto/coding:reliable`  |
+`delegate free --list-models` shows every alias and every concrete id, and the count is
+huge: 1,542 ids on 2026-10-21. **Almost all of it is phantom capacity**, which is the single
+most misleading thing about this backend. Those ids are not free API providers queueing up to
+serve you, they are mostly bridges to local CLI tools you have not installed and scrapers of
+consumer web chat UIs. Tested one model from each keyless pool:
 
-`delegate free --list-models` shows every route alias and every concrete model id. The
-catalog grows fast, so do not trust a count written here: it said "~115" while the live
-gateway was serving 1,560 ids (38 of them `auto/*` routes) on 2026-10-02. Run the command.
+| Pool | ids | What it actually is |
+| --- | --- | --- |
+| `aihorde` | 164 | **Image-generation** models, rejected for chat |
+| `dva` | 125 | Devin bridge: `DEVIN_AGENTIC_HOME must be an absolute path` |
+| `no-think` | 64 | Also the Devin catalog |
+| `aug` | 28 | Auggie CLI: `'auggie' is not recognized` |
+| `tllm` | 26 | `403 blocked by Vercel for this server egress IP` |
+| `cxa` | 26 | Codex app-server: `transport is not configured` |
+| `cfp` | 20 | Cloudflare Playground: needs a Playwright browser session |
+| `zc` | 13 | `spawn zcode ENOENT`, a local binary you do not have |
+| `ddgw`, `felo` | 11 | Scrapers of web chat UIs, both erroring |
 
-If a route keeps 403/429-ing, the keyless pool is exhausted, add provider keys in the
-OmniRoute dashboard (you have Groq/Cerebras/Gemini/Mistral/OpenRouter) or switch to `nvidia`.
+So **the number of models tells you nothing about capacity.** Ask
+`/api/providers` instead: it lists the connections you can actually reach, and that is the
+number that matters. On 2026-10-21 it was 4 connections, 3 active (`groq`, `mistral`,
+`openrouter`) with `cerebras` keyed but `isActive: false`. An `auto/*` alias ranks over the
+whole phantom catalog, which is exactly why every one of them fails.
 
 ### The `auto/*` aliases route into dead OpenCode models. Pin a concrete one.
 
@@ -171,7 +180,8 @@ defaults to `free` and falls back to `deepseek` on its own, so the normal path i
 review the diff.
 
 The pins below are for a specific capability you have a reason to want:
-- Huge volume, where even a free run's latency adds up -> `--model auto/cheap`.
+- Huge volume, where even a free run's latency adds up -> a cheaper pinned id, NOT
+  `auto/cheap`: every `auto/*` alias ranks over the phantom catalog and fails.
 - A stronger free model than OmniRoute's pool gives -> `nvidia --model
   nvidia/nemotron-3-super-120b-a12b`.
 - Vision -> `openrouter` with a `-vl:free` model and `--image`.

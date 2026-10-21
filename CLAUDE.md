@@ -20,15 +20,17 @@ Rules:
 | `PRIVACY.md` | What leaves the machine and where it goes. The directory listing's `privacyPolicyUrl` points here, so a reviewer reads it. It duplicates the README's "What this sends, and where" table on purpose; **change both or neither**, since the endpoint list is the part that rots |
 | `.claude-plugin/plugin.json` | The manifest, plus the directory listing fields (`icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`). `version` is the cache key: bump it or nobody receives the change |
 | `hooks/hooks.json`, `scripts/ensure_launcher.py` | Why a plugin-only install works. The hook writes `~/.claude/bin/delegate` pointing at the plugin's own copy, and deliberately leaves a launcher alone when it points at a checkout that still exists |
+| `HANDOVER.md` | Current state and what is next, nothing durable. See the note below |
 | `CLAUDE.md` | This file |
 
 **The skills and commands are instructions, not documentation.** A stale one does not break,
 it quietly steers every session, so they are the first thing to correct when behaviour
 changes, and `scripts/post-commit-refresh-plugin.sh` reinstalls the plugin when they do.
 
-There is no `HANDOVER.md` here. If one is ever added it holds **current state only** - where
-things stand, what is half-done, what is next. Before adding a line to any such file, ask: will
-this still be true in a month? If yes it belongs in one of the docs above, or in the vault.
+`HANDOVER.md` holds **current state only** - where things stand, what is half-done, what is
+next. Before adding a line to it, ask: will this still be true in a month? If yes it belongs in
+one of the docs above, or in the vault. It is tracked so a new session picks it up, which also
+means a stale line in it is visible in a diff; prune it as you go rather than appending.
 
 ## When Aayush says "update"
 

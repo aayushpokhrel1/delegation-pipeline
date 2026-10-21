@@ -3,7 +3,7 @@
     "free": {
       "base_url": "http://localhost:20128/v1",
       "api_key": "",
-      "model": "auto/coding"
+      "model": "mistral/codestral-latest"
     },
     "deepseek": {
       "base_url": "https://api.deepseek.com/v1",

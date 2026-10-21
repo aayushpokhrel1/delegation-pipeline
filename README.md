@@ -90,29 +90,29 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-10-20 from 130 delegated runs across 5 repos._
+_Generated 2026-10-21 from 150 delegated runs across 5 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 130 |
-| Tokens offloaded to workers | 68,570,336 (measured) |
-| Worker API calls | 2,296 |
-| Paid on the worker tier | $19.07 |
-| Claude tokens avoided | ~58,696,208 (estimated) |
-| Opus-equivalent value | ~$880.44 |
+| Runs delegated | 150 |
+| Tokens offloaded to workers | 84,920,010 (measured) |
+| Worker API calls | 2,647 |
+| Paid on the worker tier | $23.57 |
+| Claude tokens avoided | ~72,691,529 (estimated) |
+| Opus-equivalent value | ~$1090.37 |
 
 By backend:
 
 ```
-deepseek  ████████████████████   99%   68,111,284 tokens
-free      ░░░░░░░░░░░░░░░░░░░░    1%   459,052 tokens
+deepseek  ████████████████████   99%   84,196,269 tokens
+free      ░░░░░░░░░░░░░░░░░░░░    1%   723,741 tokens
 ```
 
 By month:
 
 ```
-2026-09  █████████░░░░░░░░░░░   20,873,682 tokens
-2026-10  ████████████████████   47,696,654 tokens
+2026-09  ███████░░░░░░░░░░░░░   20,873,682 tokens
+2026-10  ████████████████████   64,046,328 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
@@ -180,7 +180,7 @@ honest caveats live in [`bench/README.md`](bench/README.md).
 
 | Backend    | Provider              | Cost         | Notes                                    |
 |------------|-----------------------|--------------|------------------------------------------|
-| `free`       | OmniRoute (local)     | $0           | Local gateway, `auto/coding` model       |
+| `free`       | OmniRoute (local)     | $0           | Local gateway. Pin a concrete model, not an `auto/*` alias (see [`MODELS.md`](MODELS.md)) |
 | `nvidia`     | NVIDIA API Catalog    | free credits | build.nvidia.com; strong models, free tier |
 | `openrouter` | OpenRouter API        | free / cheap | Pin a specific `:free` or vision model; `:free` ids are rate-limited |
 | `deepseek`   | DeepSeek API          | cheap        | Reliable; good default for real work     |
@@ -332,7 +332,7 @@ at, which is what you want while developing this repo and nothing you need other
   key. Set up autostart (below) so the gateway is always there, then create a key at
   `http://localhost:20128/dashboard/api-manager` and put it in `delegate.config.json`:
   ```json
-  "free": { "base_url": "http://localhost:20128/v1", "api_key": "...", "model": "auto/coding" }
+  "free": { "base_url": "http://localhost:20128/v1", "api_key": "...", "model": "mistral/codestral-latest" }
   ```
   The key is shown once at creation (`ALLOW_API_KEY_REVEAL=false`), so copy it there and then.
   Older docs (and OmniRoute's own startup banner, plus `REQUIRE_API_KEY=false` in its `.env`)
