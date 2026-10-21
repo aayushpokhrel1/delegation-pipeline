@@ -11,7 +11,13 @@ $Log  = Join-Path $HOME ".claude\omniroute.log"
 # first pays that bill, times out, and reports the gateway "down" even though it
 # is up and compiling. So pay it here, at boot, where nobody is waiting.
 function Warm-Routes {
-    param([int]$Port, [int]$TimeoutSec = 240)
+    # 600s, not 240s: on 2026-10-21 a cold start rebuilt OmniRoute's own Next app
+    # (visible as npm peer-dependency resolution in omniroute.log.err) and took
+    # longer than 240s, so this returned false and the starter exited 1 on a
+    # gateway that came up fine a minute later. That matters more now the task
+    # repeats every 15 minutes: a too-short wait turns every heal attempt into a
+    # logged failure, and logged failures that are not failures get ignored.
+    param([int]$Port, [int]$TimeoutSec = 600)
 
     # The CLI prints "Ready" as soon as it binds, well before it can serve, so
     # wait on the listener rather than trusting startup output. Write-Host, not
