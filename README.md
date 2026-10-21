@@ -377,6 +377,20 @@ So you never have to start the gateway by hand. Logs land in `~/.claude/omnirout
 and every installer prefers a global `omniroute` (`npm i -g omniroute`) and falls back to
 `npx --yes omniroute`.
 
+**The Windows task fires at logon *and every 15 minutes*, and the repeat is the part that
+matters.** It used to be logon-only, so when the gateway process was killed on 2026-10-15
+nothing ever ran again: a logon trigger has already fired. It stayed dead for six days and
+nothing broke, because the `free` to `deepseek` escalation absorbed every failure. The only
+trace was in the ledger: 18 of the next 19 `free` attempts failed, 744s went on retries, and
+16 runs were quietly billed to the paid tier. `start-omniroute.ps1` exits early when the port
+is already listening, so the 15-minute check costs a port probe and is the cheapest thing
+that actually ends an outage rather than routing around it.
+
+`delegate --stats` now also prints a warning **above** the totals when a backend's recent
+attempts are mostly failing, because during that outage the totals themselves looked
+perfectly healthy. A fallback turns a loud failure into a quiet cost, so the degraded path
+is exactly the one that needs to announce itself.
+
 **Install OmniRoute globally, don't rely on the npx fallback.** `npx` re-extracts the package
 and discards Next's `.next` build cache on every launch, which maximises the cold-start cost
 below. On npm 11+ the global install silently skips lifecycle scripts, leaving native deps

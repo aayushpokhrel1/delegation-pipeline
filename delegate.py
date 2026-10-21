@@ -342,9 +342,37 @@ def _attempt_entry(name, backend_cfg, err, started, escalated_to=None,
     }
 
 
+def recent_health(rows, window=20, min_attempts=5, threshold=0.5):
+    """Backends whose RECENT attempts are mostly failing: {backend: (failed, seen)}.
+
+    Exists because a fallback hides an outage. The free gateway died on
+    2026-10-15 and stayed dead six days while every delegation still succeeded on
+    the paid tier, so nothing surfaced it; the evidence was in this ledger the
+    whole time, just never at the top of anything.
+
+    Recent, not all-time: an all-time rate keeps warning for weeks after a fixed
+    outage, which trains you to ignore it. Asking "are my requests fine?" is the
+    wrong question here, since they all were.
+    """
+    seq = {}
+    for row in sorted(rows, key=lambda r: r.get("ts") or ""):
+        seq.setdefault(row.get("backend") or "unknown", []).append(
+            row.get("ok") is not False)
+    sick = {}
+    for backend, oks in seq.items():
+        recent = oks[-window:]
+        if len(recent) < min_attempts:
+            continue  # too little signal to call it
+        failed = sum(1 for ok in recent if not ok)
+        if failed / len(recent) >= threshold:
+            sick[backend] = (failed, len(recent))
+    return sick
+
+
 def summarize_ledger(rows):
     """Aggregate ledger rows into the totals --stats prints. Pure: takes a list
     of dicts, returns a dict, touches no files."""
+    health = recent_health(rows)
     prompt = completion = total = calls = 0
     worker_usd = 0.0
     verify_failed = 0
@@ -400,6 +428,7 @@ def summarize_ledger(rows):
         "runs": len(rows),
         "failed_attempts": len(failed),
         "attempts_by_backend": attempts_by_backend,
+        "recent_health": health,
         "prompt": prompt,
         "completion": completion,
         "total": total,
@@ -467,6 +496,15 @@ def print_stats():
 
     s = summarize_ledger(rows)
     pct = round((1 - REVIEW_RATIO) * 100, 1)
+    # Before the totals, not after them. The totals look healthy during an outage
+    # of the free tier, because the fallback picks the work up and every run
+    # succeeds; the only tell is here.
+    for backend, (failed, seen) in sorted(s["recent_health"].items()):
+        print(f"!! {backend}: {failed} of its last {seen} attempts failed. That tier "
+              f"is probably down,\n   and the fallback has been quietly absorbing it. "
+              f"For `free`, check the gateway:\n   "
+              f"powershell -File scripts/start-omniroute.ps1   (or `npx omniroute`)")
+        print()
     print(f"delegate usage ledger: {LEDGER_PATH}")
     print(f"{s['runs']} runs from {s['first']} to {s['last']}")
     print()

@@ -717,6 +717,34 @@ def _run_main(argv, agent_result, verify_calls, cfg=None):
          delegate.record_run, delegate.LEDGER_PATH, delegate.load_config) = saved
 
 
+def _row(ts, backend, ok=True):
+    return {"ts": ts, "backend": backend, "ok": ok, "total": 10, "model": "m"}
+
+
+def test_recent_health_flags_a_tier_the_fallback_is_hiding():
+    """The free gateway died on 2026-10-15 and stayed dead six days because every
+    run still succeeded on the paid tier. This is the signal that was missing."""
+    rows = [_row(f"2026-10-15T{h:02d}:00:00Z", "free", ok=False) for h in range(8)]
+    rows += [_row(f"2026-10-15T{h:02d}:30:00Z", "deepseek") for h in range(8)]
+    sick = delegate.recent_health(rows)
+    assert sick == {"free": (8, 8)}, sick
+    assert "deepseek" not in sick, "the tier absorbing the work is fine"
+
+
+def test_recent_health_goes_quiet_once_a_tier_recovers():
+    """All-time rates keep crying after a fixed outage, which teaches you to
+    ignore them. Only the recent window counts."""
+    rows = [_row(f"2026-10-15T{h:02d}:00:00Z", "free", ok=False) for h in range(10)]
+    rows += [_row(f"2026-10-20T{h:02d}:00:00Z", "free") for h in range(20)]
+    assert delegate.recent_health(rows) == {}, "recovered tier must not warn"
+
+
+def test_recent_health_stays_silent_without_enough_signal():
+    rows = [_row("2026-10-15T01:00:00Z", "free", ok=False),
+            _row("2026-10-15T02:00:00Z", "free", ok=False)]
+    assert delegate.recent_health(rows) == {}, "2 attempts is not a diagnosis"
+
+
 def test_rollback_restores_a_modified_file():
     delegate.ROOT = tempfile.mkdtemp()
     target = os.path.join(delegate.ROOT, "keep.py")
