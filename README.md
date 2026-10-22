@@ -192,7 +192,8 @@ All of them are just an OpenAI-compatible base URL + model + key, configured in
 ### Default tier and escalation
 
 Naming no backend gets you `free`. If `free` fails before the worker has edited
-anything, the run escalates once to `deepseek` and says so on stderr:
+anything, the run tries the tier's other model ids and then escalates once to
+`deepseek`, saying so on stderr:
 
 ```
 delegate: free failed with no edits made, escalating to deepseek: ...
@@ -207,6 +208,22 @@ alone and the 4th never reached a model at all (a gateway 502 after its retries)
 sustained load. Defaulting to
 `free` and escalating on failure gets the $0 attempt without the caller having to
 predict which tasks it will finish.
+
+A tier can carry spare model ids. A backend's `models` list is tried in order after
+its `model`, which always leads, so `model` still decides what runs first and `models`
+only supplies spares:
+
+```json
+"free": {
+  "model": "mistral/codestral-latest",
+  "models": ["mistral/codestral-2508", "openrouter/nvidia/nemotron-3.5-lightning:free"]
+}
+```
+
+This exists because a tier used to point at exactly one id, so when `auto/coding`
+started 502ing on 2026-10-21 the whole free tier was down until a human noticed and
+edited the config. The spares are exhausted before the backend hop, since another id
+on a $0 tier beats a paid one.
 
 Two deliberate limits:
 
@@ -228,7 +245,8 @@ Two deliberate limits:
   `edits` alongside `rolled_back` so the pair tells you whether a failure left anything
   behind.
 - **`--model` disables escalation.** A model id belongs to one backend, so carrying
-  it to another would 404. Pinning a model means you chose the tier too.
+  it to another would 404. Pinning a model means you chose the tier too, and the
+  `models` spares are skipped for the same reason.
 - **A hop with no credential is not offered.** If `deepseek` has no key on this machine,
   escalating to it could only ever fail, so the run does not try. It stops at `free` and
   prints the three ways out: start the gateway, set any one key, or point `free` at another
@@ -537,15 +555,15 @@ on its own), Claude sizes up the task and chooses **both the backend and the mod
 using `--list-models` to see the live catalog and [`MODELS.md`](MODELS.md) as the shortlist.
 Two flavors of choice:
 
-- **`free` (OmniRoute)** → Claude picks an `auto/*` **route** (`auto/coding`, `auto/cheap`,
-  `auto/fast`, ...) and lets OmniRoute's router pick the concrete model, so it fails over
-  across your provider keys. Prefer routes over pinning one model here.
-- **`nvidia` / paid backends** → Claude picks a concrete **model id** (there's no router in
-  front), restricted to tool-calling-capable models since the worker edits via function
-  calls.
+Normally there is nothing to pick: `delegate "<task>"` takes `free`, walks its `models`
+list, then escalates. Pin a model only for a capability you have a reason to want
+(vision, a bigger model), and note that every backend needs a **concrete, tool-calling**
+model id, `free` included. OmniRoute's `auto/*` routes are not the safe choice they look
+like: they rank over a catalog that is mostly dead `oc/*` upstreams, and on 2026-10-21
+every coding alias 502'd while pinned ids worked. See [`MODELS.md`](MODELS.md).
 
-You can always force a specific backend/model/route by naming it: `delegate free --model
-auto/cheap "..."` or `delegate nvidia --model nvidia/nemotron-3-super-120b-a12b "..."`.
+Force one by naming it: `delegate free --model mistral/codestral-2508 "..."` or
+`delegate nvidia --model nvidia/nemotron-3-super-120b-a12b "..."`.
 
 ### From inside Claude Code: `/delegate`
 

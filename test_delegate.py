@@ -877,6 +877,41 @@ def test_verify_still_runs_when_the_worker_edited_something():
     assert "VERIFY PASSED" in out, out
 
 
+def test_model_chain_leads_with_the_effective_model():
+    cfg = {"backends": {"free": {"model": "a", "models": ["b", "a", "c"]}}}
+    # Configured model first, dupes dropped: `models` only supplies spares.
+    assert delegate.model_chain(cfg, "free") == ["a", "b", "c"]
+    # A pin stands alone, like it disables the backend hop.
+    assert delegate.model_chain(cfg, "free", model_override="z") == ["z"]
+    assert delegate.model_chain(cfg, "nope") == []
+
+
+def test_a_dead_model_id_retries_the_next_one_in_the_tier():
+    """One dead model used to take the whole tier down (`auto/coding`,
+    2026-10-21). The spare ids must be tried before escalating off the tier."""
+    repo = tempfile.mkdtemp()
+    cfg = {"backends": {"free": {"base_url": "http://localhost:20128/v1",
+                                 "model": "dead", "models": ["alive"]},
+                        "deepseek": {"base_url": "https://api.deepseek.com/v1",
+                                     "api_key": "sk-test", "model": "deepseek-chat"}},
+           "max_steps": 40, "temperature": 0.2, "max_tokens": 4096}
+    seen = []
+    usage = {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2,
+             "calls": 1, "edits": 1}
+
+    def worker(backend, *a, **k):
+        seen.append(backend["model"])
+        if backend["model"] == "dead":
+            raise delegate.BackendError("502 Model is unavailable", edits=0)
+        return ("SUMMARY: done", usage)
+
+    code, out = _run_main(["delegate.py", "do it", "--dir", repo], worker, [],
+                          cfg=cfg)
+    assert code == 0, f"expected the spare model to carry it: {code} {out}"
+    assert seen == ["dead", "alive"], seen
+    assert "deepseek" not in out, "must exhaust the tier's models before hopping"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

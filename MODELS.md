@@ -100,6 +100,19 @@ median function and passed, both at $0.
 automatic `free` -> `deepseek` escalation; `--model` deliberately disables it, because a model
 id belongs to one backend. Same string, opposite behaviour on failure.
 
+**A tier no longer rests on one id.** A backend's `models` list is tried in order after its
+`model` (which still leads), and `free` ships with `mistral/codestral-2508` and
+`openrouter/nvidia/nemotron-3.5-lightning:free` as spares, so a dead id costs one retry
+instead of taking the tier down until someone edits the config. Verified end to end on
+2026-10-22: a bogus id 402'd and the run finished on the spare, at $0, without touching
+`deepseek`. `--model` skips the spares, like it skips the hop.
+
+**The `auto/*` aliases are intermittent, not uniformly dead.** `auto/coding` served a real
+delegation on 2026-10-22, the day after every alias 502'd. That does not make them worth
+using: a pinned id is the predictable one, and the table below is what to pin. It does mean
+"the alias failed" is evidence about one moment, not a permanent fact, so do not re-derive the
+pool's health from a single alias call.
+
 One caveat worth knowing before relying on it: the escalation covers a backend being
 *unreachable*, not a worker being *wrong*. A failed `--verify` exits 2 and does not escalate,
 so a weaker free model shows up as more exit-2 runs for you to re-delegate, not as automatic

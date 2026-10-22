@@ -3,7 +3,11 @@
     "free": {
       "base_url": "http://localhost:20128/v1",
       "api_key": "",
-      "model": "mistral/codestral-latest"
+      "model": "mistral/codestral-latest",
+      "models": [
+        "mistral/codestral-2508",
+        "openrouter/nvidia/nemotron-3.5-lightning:free"
+      ]
     },
     "deepseek": {
       "base_url": "https://api.deepseek.com/v1",

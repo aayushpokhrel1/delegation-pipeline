@@ -66,7 +66,15 @@ DEFAULT_CONFIG = {
         "free": {
             "base_url": "http://localhost:20128/v1",
             "api_key": "",
-            "model": "auto/coding",
+            # A concrete id, not an `auto/*` alias: every alias ranks over
+            # OmniRoute's phantom catalog of dead `oc/*` routes and 502s. The
+            # extras are the other ids measured working on 2026-10-21 (see
+            # MODELS.md); they exist so one dead model cannot take the tier down.
+            "model": "mistral/codestral-latest",
+            "models": [
+                "mistral/codestral-2508",
+                "openrouter/nvidia/nemotron-3.5-lightning:free",
+            ],
         },
         "deepseek": {
             "base_url": "https://api.deepseek.com/v1",
@@ -153,6 +161,26 @@ def fallback_for(name, cfg, model_override=None):
             or not backend_has_credential(cfg, nxt)):
         return None
     return nxt
+
+def model_chain(cfg, name, model_override=None):
+    """Model ids to try on `name`, in order: its effective model first, then the
+    extras in its optional `models` list.
+
+    The effective model always leads, so configuring `model` still decides what
+    runs first and `models` only supplies spares. A pin returns itself alone, for
+    the same reason it disables the backend hop: the caller took responsibility.
+
+    Exists because `free` pointed at one id, so when `auto/coding` started 502ing
+    the whole tier was down until a human noticed (2026-10-21)."""
+    if model_override:
+        return [model_override]
+    b = cfg.get("backends", {}).get(name, {})
+    chain = [b["model"]] if b.get("model") else []
+    for m in b.get("models") or []:
+        if m not in chain:
+            chain.append(m)
+    return chain
+
 
 CONFIG_PATH = os.path.join(
     os.path.expanduser("~"), ".claude", "delegate.config.json"
@@ -1484,6 +1512,14 @@ def main():
     used_backend, used_cfg = args.backend, backend
     escalated_from = None
     edited_paths = set()
+    # Attempts left if this one dies, in order: the rest of this tier's models
+    # first, then one hop to another backend. Built up front so the hop rule
+    # stays "one", however many spare model ids a tier carries.
+    pending = [(args.backend, m)
+               for m in model_chain(cfg, args.backend, args.model)[1:]]
+    _hop = fallback_for(args.backend, cfg, args.model)
+    if _hop:
+        pending += [(_hop, m) for m in model_chain(cfg, _hop)]
     # Arm the edit journal before the worker can write anything, so a mid-run
     # backend death can be undone rather than left for the caller to untangle.
     start_journal()
@@ -1509,8 +1545,8 @@ def main():
                 edited_paths.clear()
             start_journal()  # re-arm for the next attempt
 
-            # Only escalate onto a tree we actually restored.
-            nxt = None if rb_failures else fallback_for(used_backend, cfg, args.model)
+            # Only retry onto a tree we actually restored.
+            nxt, nxt_model = (None, None) if rb_failures or not pending                 else pending.pop(0)
             record_run(_attempt_entry(used_backend, used_cfg, e, started,
                                       escalated_to=nxt, rolled_back=restored,
                                       rollback_failed=bool(rb_failures)))
@@ -1522,11 +1558,17 @@ def main():
             if not nxt:
                 die(f"{used_backend} failed and no fallback is available: {e}"
                     + cold_start_help(cfg, used_backend))
-            log(f"delegate: {used_backend} failed, escalating to {nxt}: {e}")
-            escalated_from, used_backend = used_backend, nxt
-            used_cfg = resolve_backend(cfg, nxt)
-            used_cfg.setdefault("temperature", cfg.get("temperature"))
-            used_cfg.setdefault("max_tokens", cfg.get("max_tokens"))
+            if nxt == used_backend:
+                log(f"delegate: {used_backend} failed on "
+                    f"{used_cfg['model']}, retrying on {nxt_model}: {e}")
+                used_cfg = dict(used_cfg)
+            else:
+                log(f"delegate: {used_backend} failed, escalating to {nxt}: {e}")
+                escalated_from = used_backend
+                used_cfg = resolve_backend(cfg, nxt)
+                used_cfg.setdefault("temperature", cfg.get("temperature"))
+                used_cfg.setdefault("max_tokens", cfg.get("max_tokens"))
+            used_backend, used_cfg["model"] = nxt, nxt_model
             log(f"delegate: backend={used_backend} model={used_cfg['model']} root={ROOT}")
 
     # Worker tokens ran on the free/cheap backend, not the Claude subscription.
