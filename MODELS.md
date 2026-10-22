@@ -78,7 +78,7 @@ before concluding anything about a model id.
 | `openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | **Works** |
 | `mistral/devstral-latest`, `devstral-medium-latest` | `429 Rate limit exceeded`, persistently |
 | `mistral/mistral-large-latest` | `403 not available in your subscription` |
-| `groq/*` | `not available in the active live catalog`, and a Cloudflare `403` |
+| `groq/*` | Cloudflare **error 1010** (banned client signature). Two of the 18 listed ids are also phantoms: `not available in the active live catalog` |
 | `openrouter/*` **paid** ids | `402 Insufficient credits. This account never purchased credits` |
 | some `:free` ids (`...content-safety:free`, `...super-120b-a12b:free`) | `404 No endpoints found` |
 | `oc/*` | `410` deprecated, or `403` gated |
@@ -89,8 +89,39 @@ OpenRouter ones reachable without credits; they are also rate-limited (~50/day) 
 they suit a one-off quality run rather than volume. `codestral` is the default because it is
 a code model and not day-capped.
 
-**Enabling the `cerebras` connection would add another**, and it is already keyed and merely
-switched off in the dashboard.
+**Enabling `cerebras` does not add another, and this file used to say it would.** Tried on
+2026-10-22: the stored key tests `valid` (368ms), toggling `isActive` synced 3 ids into the
+catalog, and then every single chat call came back Cloudflare **error 1010**. It is switched
+back off, because an active connection that cannot serve a request only advertises dead ids
+to the next person reading the catalog.
+
+### Cloudflare 1010 is one cause behind three leads, and it is not yours to fix
+
+`groq` and `cerebras` both sit behind a Cloudflare rule that bans OmniRoute's client
+signature. What rules the obvious explanations out, measured 2026-10-22:
+
+- **Not the key.** `POST /api/providers/<id>/test` returns `valid: true` for both, and the
+  catalog sync reaches the provider fine. `apiKeyHealth` saying `invalid` was a stale single
+  failure from seven weeks earlier; believing that field instead of testing it is how
+  "cerebras needs a new key" got written down.
+- **Not your IP.** Plain `curl` from the same machine to `api.cerebras.ai` and
+  `api.groq.com` with a bogus key gets a clean `401`, not a 1010. 1010 fires before auth, so
+  that is a decisive test and it costs nothing.
+- **Not the User-Agent.** Reproduced with a Chrome UA, `node`, `undici` and
+  `OmniRoute/3.8.49`: all four get the same `401`, never a 1010.
+- **Not OmniRoute's proxy egress.** OmniRoute ships a free rotating-proxy subsystem
+  (`src/lib/freeProxyProviders`, `proxyEgress.ts`) with a global `proxyEnabled: true`.
+  Turning it off globally and per connection, then restarting the gateway, left both
+  providers at 1010 while `mistral` kept working. **It made groq worse:** with the proxy on,
+  one `groq/openai/gpt-oss-120b` call succeeded and tool-called cleanly before the rest
+  started failing, which is a clean proxy IP getting through. With it off, groq never worked
+  once. The setting is back on.
+
+What is left is the TLS/client fingerprint of OmniRoute's HTTP client, which you cannot
+change from config, and the same shape explains the `tllm` pool's `403 blocked by Vercel for
+this server egress IP`. **So `groq` and `cerebras` are not leads, they are the same closed
+door twice.** Real free capacity on this machine is `mistral` plus OpenRouter's 17 `:free`
+ids. Nothing in this section needs re-testing unless OmniRoute changes its HTTP client.
 
 So `free` works today with `"model": "mistral/codestral-latest"`. Verified end to end: a real
 delegation annotated a module in 3 calls and passed its test, and a second one fixed a

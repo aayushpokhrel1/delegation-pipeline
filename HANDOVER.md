@@ -19,26 +19,23 @@ holds what was done, in more detail.
 - `delegate --stats` warns when a tier's recent attempts are mostly failing. It will
   keep warning about `free` until ~20 successful free runs age out the window.
 
-## Next: the free tier's remaining leads
+## Next: nothing open on the free tier
 
-Lead 4 from the previous handover (a model fallback list) is **done**, and it was the only
-one that was a code change. What is left is all environment, i.e. clicks and keys in
-OmniRoute, not edits here. `MODELS.md` holds the measurements; read it before touching
-anything, since two wrong diagnoses came from testing too small a sample.
+All four leads from the 2026-10-21 handover are closed. Lead 4 (spare model ids) shipped.
+Leads 1 and 2 were chased on 2026-10-22 and are **dead ends with a measured reason**, now in
+`MODELS.md`: `groq` and `cerebras` both sit behind a Cloudflare rule that 1010-bans
+OmniRoute's client signature, which is not reachable from config. Read that section before
+reopening either, and in particular do not re-test "is it the key / the IP / the UA / the
+proxy", because all four are ruled out there with the commands that ruled them out.
 
-1. **Enable `cerebras`.** Already keyed, `isActive: false` in the OmniRoute dashboard. One
-   toggle, and Cerebras is fast with a generous free tier. Highest value for least effort.
-2. **Work out why `groq` is broken.** Active and keyed, but ids return `not available in the
-   active live catalog for provider 'groq'` and one hit a Cloudflare `403`. Looks like a
-   catalog-sync problem inside OmniRoute rather than a bad key, so check whether its model
-   list can be refreshed.
-3. **Add another free provider key** (Gemini has a free tier; the README mentions it). Each
-   new working id can go straight into `free.models`.
+The free tier's real capacity is `mistral` (not day-capped, the default) plus OpenRouter's 17
+`:free` ids (~50/day, slow). That is enough for the pipeline's actual load, and a dead id now
+costs one retry instead of the tier.
 
-The keyless pools in OmniRoute's 1,542-id catalog are **not** a lead: each is structurally
-unusable (image models, bridges to CLIs you do not have, blocked egress, chat-UI scrapers),
-and `MODELS.md` has the per-pool table. `cfp` (Cloudflare Playground, needs a Playwright
-browser) is the only one that might just work; cheap to test, unknown reliability.
+Lead 3 is the only one left and it is optional: **another free provider key** (Gemini has a
+free tier) would widen the pool. Each new working id goes straight into `free.models`. Check
+first whether the provider is Cloudflare-fronted, since that is now a known blocker rather
+than a surprise.
 
 ### Two constraints not to rediscover
 
@@ -48,3 +45,11 @@ browser) is the only one that might just work; cheap to test, unknown reliabilit
 - The escalation covers a backend being **unreachable**, not a worker being **wrong**. A failed
   `--verify` exits 2 without escalating, so a weaker free model shows up as more exit-2 runs
   to re-delegate.
+
+### OmniRoute state, as left on 2026-10-22
+
+`cerebras` back to `isActive: false`, global and per-connection `proxyEnabled` back to `true`,
+gateway restarted (pid changes; the scheduled task brings it back). `free` smoke-tested end to
+end after the restart: edit + verify passed at $0. Its admin API takes the gateway's own API
+key as a Bearer token: `GET /api/providers`, `GET /api/settings`,
+`POST /api/providers/<id>/test`, and `PATCH` on either to change one field.
