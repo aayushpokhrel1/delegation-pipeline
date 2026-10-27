@@ -8,7 +8,7 @@ holds what was done, in more detail.
 ## Where things stand (2026-10-22)
 
 - Working tree clean, pushed to `origin/master`.
-- 52 checks pass (`python test_delegate.py`). Plugin version `0.3.5`.
+- 52 checks pass (`python test_delegate.py`). Plugin version `0.3.6`.
 - `free` is the default path and works: gateway up, `free.model` is
   `mistral/codestral-latest` in `~/.claude/delegate.config.json` (backup at
   `delegate.config.json.bak`).
