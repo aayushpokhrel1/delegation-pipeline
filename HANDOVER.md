@@ -5,10 +5,11 @@ month. If yes it belongs in `README.md`, `MODELS.md`, `bench/README.md`, a comme
 code, or the vault, per `CLAUDE.md`. Do not grow this into a narrative: `git log` already
 holds what was done, in more detail.
 
-## Where things stand (2026-10-22)
+## Where things stand (2026-10-26)
 
 - Working tree clean, pushed to `origin/master`.
-- 52 checks pass (`python test_delegate.py`). Plugin version `0.3.6`.
+- 52 checks pass (`python test_delegate.py`). Plugin version `0.3.6`, accepted by the
+  plugin directory scanner.
 - `free` is the default path and works: gateway up, `free.model` is
   `mistral/codestral-latest` in `~/.claude/delegate.config.json` (backup at
   `delegate.config.json.bak`).
