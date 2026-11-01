@@ -41,7 +41,8 @@ the less reliable tier, not the weaker one, and hand-routing by difficulty is wh
 unused. Name a backend only for the specific jobs below:
 
 - **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you. Slow; the pool
-  drains under sustained load, which the automatic escalation now covers. Name it explicitly
+  drains under sustained load, which the spare model ids and the automatic escalation now
+  cover. Name it explicitly
   only to force $0 and fail rather than fall back.
 - **`openrouter` ($0 `:free`, rate-limited):** two jobs. (1) **free-remote fallback** when
   OmniRoute is dry, preferred over `nvidia` so nvidia's finite credits stay in reserve.

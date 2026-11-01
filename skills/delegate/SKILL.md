@@ -47,8 +47,9 @@ can't be specified in isolation, one-liners (the spec would cost more tokens tha
 ~/.claude/bin/delegate [backend] [--model <id>] "<task>"
 ```
 
-The backend is optional and defaults to `free`, escalating once to `deepseek` on failure.
-Both attempts land in the ledger, the failed one with `"ok": false` and `"escalated_to"`, so
+The backend is optional and defaults to `free`. On failure it tries the tier's spare model
+ids (`models` in the backend's config) and then escalates once to `deepseek`.
+Every attempt lands in the ledger, the failed one with `"ok": false` and `"escalated_to"`, so
 a dry tier leaves a trace instead of looking like a tier nobody routed to.
 
 **After an escalation the tree is clean, so review the diff normally.** A backend that dies
@@ -61,8 +62,9 @@ is the one case where you inspect the tree by hand before doing anything else.
 free tier costs nothing but is slow, and it is now the default, so this applies to every
 delegation rather than only the ones that opt in. Measured on one small annotation task
 (2026-10-02): `free` took **186s over 9 calls**, `deepseek` took **28s over 3** for the same
-work. A `free` failure spends ~25s on its retries before escalating, so the worst case is
-roughly 25s + the deepseek run. Budget minutes, not seconds, and do not kill a run that looks
+work. A `free` failure now walks the tier's spare model ids before escalating, each spending
+~25s on its own retries, so the worst case is roughly 25s per configured `free` model plus
+the deepseek run. Budget minutes, not seconds, and do not kill a run that looks
 stuck. If you need the answer *now* rather than for $0, name `deepseek` explicitly: that is
 what naming a backend is for.
 

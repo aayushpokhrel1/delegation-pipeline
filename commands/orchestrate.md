@@ -43,7 +43,7 @@ unused. Name a backend only for the specific jobs below.
 
 - **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you (`--model
   auto/coding`, or `auto/cheap` for high volume). Slow; the pool drains under sustained
-  load, which the automatic escalation now covers.
+  load, which the spare model ids and the automatic escalation now cover.
 - **`openrouter` ($0 `:free`, rate-limited):** the **free-remote fallback** when OmniRoute is
   dry, preferred over `nvidia` so nvidia's finite credits stay in reserve; and the **pin
   lever** for a specific fast/quality free model, one not on the nvidia account, or a

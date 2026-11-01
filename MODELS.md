@@ -44,8 +44,15 @@ consumer web chat UIs. Tested one model from each keyless pool:
 So **the number of models tells you nothing about capacity.** Ask
 `/api/providers` instead: it lists the connections you can actually reach, and that is the
 number that matters. On 2026-10-21 it was 4 connections, 3 active (`groq`, `mistral`,
-`openrouter`) with `cerebras` keyed but `isActive: false`. An `auto/*` alias ranks over the
-whole phantom catalog, which is exactly why every one of them fails.
+`openrouter`) with `cerebras` keyed but `isActive: false`. Everything else in the catalog is
+a keyless community pool you hold no connection for, which is why the router's attempts at
+it come back `exhausted_connection:noauth`. An `auto/*` alias ranks over that whole phantom
+catalog, which is exactly why every one of them fails.
+
+The gateway's admin API takes the gateway's own API key as a Bearer token, so you can check
+all of this without the dashboard: `GET /api/providers`, `GET /api/settings`,
+`POST /api/providers/<id>/test` to test one connection's key, and `PATCH` on either to change
+a single field.
 
 ### The `auto/*` aliases route into dead OpenCode models. Pin a concrete one.
 
@@ -62,13 +69,6 @@ hundreds of live ones, so the fix is the model name, not the provider keys.
 
 What each provider actually did, tested with a tool definition attached, because the worker
 edits through function calls and a model that cannot tool-call is useless here:
-
-`/api/providers` on the gateway is the authoritative list of what you can actually reach, and
-it says **4 connections, 3 active**: `groq`, `mistral`, `openrouter`, plus `cerebras`
-configured but `isActive: false`. Everything else in the 1,542-id catalog (`aihorde`, `dva`,
-`no-think`, `oc`, ...) is a keyless community pool you hold no connection for, which is why
-the router's attempts at it come back `exhausted_connection:noauth`. Check that endpoint
-before concluding anything about a model id.
 
 | Model | Result |
 | --- | --- |

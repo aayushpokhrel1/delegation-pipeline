@@ -573,6 +573,20 @@ def test_cold_start_help_empty_for_remote_backend():
     assert delegate.cold_start_help(cfg, "deepseek") == ""
 
 
+def _temp_repo_dir():
+    """A TemporaryDirectory for a git repo, whose cleanup is allowed to fail.
+
+    `git init` leaves read-only files under `.git`, and on Windows git can keep a
+    handle open past the end of the test. Python 3.14's cleanup raises on both
+    (`WinError 32` in use, `WinError 5` denied) from the context manager's exit,
+    so the exception lands AFTER every assertion has already passed and takes the
+    whole run down with it: on 2026-10-31 the suite stopped at 35 of 52 checks
+    with nothing actually broken. A leaked temp dir is the OS's problem to sweep;
+    a suite that cannot report its own result is ours.
+    """
+    return tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+
+
 def _init_temp_repo(d):
     """git init `d` with a local identity and signing off, so the tests below can
     commit on a machine with no global git config."""
@@ -618,7 +632,7 @@ def test_git_commit_only_stages_the_workers_paths():
     """The bug this guards: git_commit used `git add -A`, so a task commit swept in
     the user's unrelated in-progress edits and untracked scratch files."""
     original_root = delegate.ROOT
-    with tempfile.TemporaryDirectory() as d:
+    with _temp_repo_dir() as d:
         try:
             _init_temp_repo(d)
             for name in ("worker.txt", "unrelated.txt"):
@@ -661,7 +675,7 @@ def test_git_commit_only_stages_the_workers_paths():
 
 def test_git_commit_with_no_paths_is_a_noop():
     original_root = delegate.ROOT
-    with tempfile.TemporaryDirectory() as d:
+    with _temp_repo_dir() as d:
         try:
             _init_temp_repo(d)
             with open(os.path.join(d, "unrelated.txt"), "w", encoding="utf-8") as f:
@@ -913,8 +927,14 @@ def test_a_dead_model_id_retries_the_next_one_in_the_tier():
 
 
 if __name__ == "__main__":
+    # The count is printed because a suite that stops early still prints a wall of
+    # "ok" lines: on 2026-10-31 a teardown error ended the run at 35 of 52 checks
+    # and the only difference was the absence of the last line. A total is harder
+    # to skim past than a missing line.
+    ran = 0
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):
             fn()
+            ran += 1
             print(f"ok  {name}")
-    print("all checks passed")
+    print(f"all {ran} checks passed")

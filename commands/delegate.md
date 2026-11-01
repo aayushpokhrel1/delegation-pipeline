@@ -16,8 +16,8 @@ thing as the task and **you choose the backend and model yourself** based on the
 
 **Do not hand-route by difficulty** (the gate is a tight, verifiable spec, not low
 difficulty):
-- **Backend: omit it.** The CLI defaults to `free` ($0) and escalates once to `deepseek`
-  if `free` cannot be reached, which is measured to cost the same to review as a paid
+- **Backend: omit it.** The CLI defaults to `free` ($0), tries that tier's spare model ids
+  if one is dead, then escalates once to `deepseek` if `free` cannot be reached, which is measured to cost the same to review as a paid
   worker's diff. Name a backend only for a reason: `deepseek` when the task must not be
   retried from scratch or when pinning `--model` (pinning disables escalation);
   `openrouter` to **pin** a specific fast `:free` or vision model (`:free` ids are
