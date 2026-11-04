@@ -35,6 +35,7 @@
       }
     }
   },
+  "default_backend": "free",
   "max_steps": 40,
   "temperature": 0.2,
   "max_tokens": 4096,

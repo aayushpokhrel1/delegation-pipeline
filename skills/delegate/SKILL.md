@@ -14,10 +14,31 @@ current repo. It **cannot** run shell or git, by design: you review the resultin
 and commit.
 
 Installing this plugin is enough: a `SessionStart` hook writes the `~/.claude/bin/delegate`
-launcher pointing at the plugin's own copy. `install.sh` / `install.ps1` are only for working
-on a clone, where the launcher points at your checkout instead. A backend still needs setup,
-either a local OmniRoute gateway for `free` or an API key for a remote tier. See the
-[README](https://github.com/aayushpokhrel1/delegation-pipeline) for backends and keys.
+launcher pointing at the plugin's own copy. It needs Python 3.8+ on PATH; without it the hook
+writes nothing and there is no `delegate` to run. `install.sh` / `install.ps1` are only for
+working on a clone, where the launcher points at your checkout instead.
+
+**First run on a fresh machine: a backend needs setting up, and say so before delegating
+rather than after a failure.** Nothing is configured out of the box. Walk the user through
+[GETTING-STARTED.md](https://github.com/aayushpokhrel1/delegation-pipeline/blob/master/GETTING-STARTED.md),
+in this order:
+
+- **OpenRouter**, the fastest $0 start: one key from https://openrouter.ai/keys, no Node and
+  no gateway, free `:free` models, but only ~50 requests/day at $0 and a run spends 3-17 of
+  them, so budget a handful of delegations per day.
+- **NVIDIA**, also keyless-free in effect: free trial credits at https://build.nvidia.com,
+  stronger models and higher limits, but the catalog churns so `--list-models` first.
+- **deepseek**, the one worth paying for: not free, but ~$5 of prepaid credit lasts a long
+  time at ~$0.28/Mtok, and it is ~Sonnet-class and several times faster than the free tiers.
+  Most people end up here for real work.
+- **`free` / OmniRoute** last. It is the default backend and the cheapest at volume, but it
+  is the heaviest setup: Node, `npm i -g omniroute`, a gateway key of its own, and ideally
+  free-tier provider keys added in its dashboard. Not a first-run step.
+
+Whichever tier the user sets up, add `"default_backend": "<name>"` to
+`~/.claude/delegate.config.json` so the no-backend form below aims at the tier they actually
+have, instead of spending three connection failures on an absent local gateway.
+See the [README](https://github.com/aayushpokhrel1/delegation-pipeline) for backends and keys.
 
 ## When to use
 

@@ -344,6 +344,20 @@ def test_resolve_positionals_treats_a_lone_argument_as_the_task():
     assert delegate.resolve_positionals("free", None, known) == ("free", None)
 
 
+def test_resolve_positionals_honours_a_configured_default_backend():
+    # Someone with one remote key and no local gateway sets default_backend, so
+    # the no-backend form the skills use stops aiming at an absent `free`.
+    known = {"free": {}, "openrouter": {}}
+    assert delegate.resolve_positionals(
+        "add type hints", None, known, "openrouter") == (
+        "openrouter", "add type hints")
+    assert delegate.resolve_positionals(None, None, known, "openrouter") == (
+        "openrouter", None)
+    # An explicit backend still wins over the configured default.
+    assert delegate.resolve_positionals("free", "do a thing", known, "openrouter") == (
+        "free", "do a thing")
+
+
 def test_fallback_for_picks_the_configured_hop():
     # The hop needs a usable credential now, or it is not offered at all; see
     # test_fallback_skips_uncredentialed_hop for the other half of that rule.

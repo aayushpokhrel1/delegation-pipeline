@@ -20,9 +20,15 @@ orchestrator) review the resulting `git diff` and commit.
 ~/.claude/bin/delegate [backend] "<task>"
 ```
 
-The backend is optional and defaults to `free` ($0). When `free` cannot be reached,
-the run escalates once to `deepseek` automatically, so you do not have to guess a
-tier per task. See [Backends](#backends).
+The backend is optional and defaults to `free` ($0), or to whatever you set as
+`default_backend`. When the default cannot be reached, the run escalates once to
+`deepseek` automatically, so you do not have to guess a tier per task. See
+[Backends](#backends).
+
+**New here, or setting this up for someone who is?** Read
+[GETTING-STARTED.md](GETTING-STARTED.md): Windows, from nothing but Claude Code, about ten
+minutes, and $0 if you want it to stay that way. The rest of this README assumes you are
+already running.
 
 ![demo](assets/demo.gif)
 
@@ -279,9 +285,13 @@ itself: a [`SessionStart` hook](hooks/hooks.json) runs
 `~/.claude/bin/delegate` launcher pointing at the plugin's own copy of `delegate.py`. It
 appears at the start of your next Claude Code session, with no clone and no installer.
 
+It needs **Python 3.8+ on PATH**. Without it the hook writes nothing and there is no
+`delegate` to run, which is the single most common "I installed it and nothing happened".
+
 The backends still need their own setup, which is the one manual step: the `free` tier wants
 a local OmniRoute gateway running, and the remote tiers want an API key. See
-[Keys](#keys) and [Autostart](#autostart).
+[Keys](#keys) and [Autostart](#autostart), or
+[GETTING-STARTED.md](GETTING-STARTED.md) for the shortest path to a working $0 setup.
 
 ### Clone-based install
 
@@ -346,6 +356,18 @@ up its own launcher. A clone only changes which copy of `delegate.py` that launc
 at, which is what you want while developing this repo and nothing you need otherwise.
 
 ### Keys
+
+**Whichever tier you set up, name it as the default.** The skills tell the orchestrator to
+delegate without naming a backend, and the built-in default is `free`, the local gateway. On
+a machine without that gateway every such call spends three connection failures and then
+dies, because the one declared hop is `deepseek`. One line in
+`~/.claude/delegate.config.json` fixes it:
+
+```json
+{ "default_backend": "openrouter" }
+```
+
+It accepts any configured backend name, and an explicitly named backend still wins over it.
 
 - **free**: needs a local OmniRoute gateway *and*, on current OmniRoute (3.8.50+), an API
   key. Set up autostart (below) so the gateway is always there, then create a key at

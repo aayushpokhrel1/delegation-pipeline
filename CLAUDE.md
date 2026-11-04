@@ -13,6 +13,7 @@ Rules:
 | File | What it holds |
 | --- | --- |
 | `README.md` | What it is, the backends, how to install it, and the generated "Measured impact" block |
+| `GETTING-STARTED.md` | The from-nothing setup path for a newcomer on Windows, written to be handed to someone who has only Claude Code. Deliberately opinionated (openrouter first, deepseek when you want it to just work, OmniRoute last) and deliberately short; everything exhaustive stays in the README |
 | `MODELS.md` | Model shortlist per backend, for when you pin `--model`. Goes stale fast: check it against `delegate <backend> --list-models` rather than trusting it |
 | `bench/README.md` | What the benchmark measures, how to run it, and what its ratio does **not** prove |
 | `bench/RESULTS.md` | The last benchmark run. `REVIEW_RATIO` in `delegate.py` is derived from it, and a test asserts they agree, so it is generated, never hand-edited |

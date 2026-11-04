@@ -5,11 +5,17 @@ month. If yes it belongs in `README.md`, `MODELS.md`, `bench/README.md`, a comme
 code, or the vault, per `CLAUDE.md`. Do not grow this into a narrative: `git log` already
 holds what was done, in more detail.
 
-## Where things stand (2026-11-01)
+## Where things stand (2026-11-04)
 
-- Working tree clean, pushed to `origin/master`. Plugin version `0.3.7`; `0.3.6` was the build the plugin directory scanner
-  accepted, and the skills and commands changed since, so this bump is what ships them.
-- 52 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
+- Plugin version `0.3.8`, which ships the onboarding work below; `0.3.6` was the last build
+  the plugin directory scanner accepted.
+- `GETTING-STARTED.md` is new: the from-nothing path for a newcomer on Windows. Written for
+  a first external user, and dry-run end to end (unconfigured, minimal config, bad
+  `default_backend`) rather than written from memory.
+- `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
+  It exists because the skills say to name no backend, so on a machine with no local gateway
+  every delegation died after three connection failures.
+- 53 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
   until 2026-11-01: `TemporaryDirectory` cleanup raised on git's read-only files under
   Windows and killed the run at 35 checks, with nothing actually broken. Fixed at
   `_temp_repo_dir()` in `test_delegate.py`.

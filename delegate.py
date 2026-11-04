@@ -133,7 +133,7 @@ class BackendError(RuntimeError):
         self.usage = usage or {}
 
 
-def resolve_positionals(backend, task, known_backends):
+def resolve_positionals(backend, task, known_backends, default=None):
     """Return (backend, task) with the default tier filled in.
 
     `backend` and `task` are both optional positionals, so `delegate "<task>"`
@@ -141,10 +141,18 @@ def resolve_positionals(backend, task, known_backends):
     first argument is not a configured backend and nothing followed it, it is the
     task. Without this, defaulting the backend made the common one-argument call
     fail with "Unknown backend '<your whole task>'".
+
+    `default` overrides DEFAULT_BACKEND, and comes from `default_backend` in the
+    user's config. It exists because the skills tell the orchestrator to name no
+    backend, so on a machine with no local gateway (anyone who set up a single
+    remote key instead) every such call spent three connection failures on `free`
+    and then died, since the one declared hop is deepseek. One config line now
+    points the no-backend form at the tier that machine actually has.
     """
+    default = default or DEFAULT_BACKEND
     if backend and backend not in known_backends and not task:
-        return DEFAULT_BACKEND, backend
-    return backend or DEFAULT_BACKEND, task
+        return default, backend
+    return backend or default, task
 
 
 def fallback_for(name, cfg, model_override=None):
@@ -280,17 +288,34 @@ def cold_start_help(cfg, name):
     b = cfg["backends"][name]
     if not _is_local_backend(b):
         return ""
+    # This text is the whole setup guide for anyone whose first run fails, which is
+    # everyone who installed the plugin and nothing else. So it names each option's
+    # real cost and its signup URL rather than saying "set a key": a first-timer
+    # cannot tell which of these tiers is free. Keep it concrete.
     return (
         f"\n\nThe '{name}' backend talks to a local gateway at {b['base_url']}, "
         f"and nothing is listening there.\n"
-        f"Three ways forward:\n"
-        f"  1. Start the gateway, then run the same command again:\n"
+        f"No backend is set up yet. Options, least effort first:\n"
+        f"  1. A remote FREE tier: no gateway, no Node, one key.\n"
+        f"       OpenRouter  free ':free' models, ~50 requests/day at $0\n"
+        f"                   key: https://openrouter.ai/keys   env: OPENROUTER_API_KEY\n"
+        f"       NVIDIA      free trial credits, stronger models, higher limits\n"
+        f"                   key: https://build.nvidia.com     env: NVIDIA_API_KEY\n"
+        f"  2. deepseek: not free, but prepay ~$5 once and it is the reliable tier,\n"
+        f"     ~Sonnet-class and several times faster than the free ones.\n"
+        f"       key: https://platform.deepseek.com   env: DEEPSEEK_API_KEY\n"
+        f"  3. Start the local gateway for '{name}', then re-run the same command:\n"
         f"       npx --yes omniroute\n"
-        f"  2. Use a remote backend instead: set one of DEEPSEEK_API_KEY, "
-        f"OPENROUTER_API_KEY or\n"
-        f"     NVIDIA_API_KEY in your environment, then re-run.\n"
-        f"  3. Point '{name}' at any other OpenAI-compatible endpoint by editing\n"
+        f"     Needs Node, plus a key of its own on OmniRoute 3.8.50+ from\n"
+        f"     http://localhost:20128/dashboard/api-manager pasted into "
+        f"'{name}'.api_key.\n"
+        f"     Best for volume, not for a first run.\n"
+        f"  4. Point '{name}' at any other OpenAI-compatible endpoint by editing\n"
         f"     {CONFIG_PATH} (start from config.example.json).\n"
+        f"\nWhichever you pick, make it the default so a bare "
+        f"delegate \"<task>\" uses it,\n"
+        f"by adding this line to {CONFIG_PATH}:\n"
+        f"    \"default_backend\": \"openrouter\"\n"
     )
 
 
@@ -1477,8 +1502,12 @@ def main():
 
     cfg = load_config()
 
+    default_backend = cfg.get("default_backend") or DEFAULT_BACKEND
+    if default_backend not in cfg["backends"]:
+        die(f"default_backend '{default_backend}' in {CONFIG_PATH} is not a "
+            f"configured backend. Known: {', '.join(cfg['backends'])}")
     args.backend, args.task = resolve_positionals(
-        args.backend, args.task, cfg["backends"])
+        args.backend, args.task, cfg["backends"], default_backend)
 
     backend = resolve_backend(cfg, args.backend)
     if args.model:
