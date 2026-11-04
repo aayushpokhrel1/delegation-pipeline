@@ -11,7 +11,9 @@ holds what was done, in more detail.
   the plugin directory scanner accepted.
 - `GETTING-STARTED.md` is new: the from-nothing path for a newcomer on Windows. Written for
   a first external user, and dry-run end to end (unconfigured, minimal config, bad
-  `default_backend`) rather than written from memory.
+  `default_backend`) rather than written from memory. It recommends `deepseek` first and
+  `free` + `deepseek` as the destination, which is what the escalation chain was built for;
+  an earlier draft led with `openrouter` and quietly undercut that design.
 - `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
   It exists because the skills say to name no backend, so on a machine with no local gateway
   every delegation died after three connection failures.

@@ -19,25 +19,31 @@ writes nothing and there is no `delegate` to run. `install.sh` / `install.ps1` a
 working on a clone, where the launcher points at your checkout instead.
 
 **First run on a fresh machine: a backend needs setting up, and say so before delegating
-rather than after a failure.** Nothing is configured out of the box. Walk the user through
-[GETTING-STARTED.md](https://github.com/aayushpokhrel1/delegation-pipeline/blob/master/GETTING-STARTED.md),
-in this order:
+rather than after a failure.** Nothing is configured out of the box. Point the user at
+[GETTING-STARTED.md](https://github.com/aayushpokhrel1/delegation-pipeline/blob/master/GETTING-STARTED.md)
+and recommend in this order:
 
-- **OpenRouter**, the fastest $0 start: one key from https://openrouter.ai/keys, no Node and
-  no gateway, free `:free` models, but only ~50 requests/day at $0 and a run spends 3-17 of
-  them, so budget a handful of delegations per day.
-- **NVIDIA**, also keyless-free in effect: free trial credits at https://build.nvidia.com,
-  stronger models and higher limits, but the catalog churns so `--list-models` first.
-- **deepseek**, the one worth paying for: not free, but ~$5 of prepaid credit lasts a long
-  time at ~$0.28/Mtok, and it is ~Sonnet-class and several times faster than the free tiers.
-  Most people end up here for real work.
-- **`free` / OmniRoute** last. It is the default backend and the cheapest at volume, but it
-  is the heaviest setup: Node, `npm i -g omniroute`, a gateway key of its own, and ideally
-  free-tier provider keys added in its dashboard. Not a first-run step.
+- **`free` + `deepseek` is the intended setup**, and what to describe as the destination:
+  `free` runs at $0 and escalates to `deepseek` by itself when it is dry, so the bulk costs
+  nothing and the hard cases still land. The escalation needs no configuration beyond having
+  both tiers.
+- **Start with `deepseek` alone**, because it is the half that works immediately and the
+  half that makes the tool worth using: ~Sonnet-class, several times faster than any free
+  tier (28s against 186s on the same measured task), and at ~$0.28/Mtok about $5 of prepaid
+  credit lasts a long time. Key at https://platform.deepseek.com, env `DEEPSEEK_API_KEY`.
+- **Add `free` second, not first.** It is the default backend and the cheapest at volume,
+  but it is a LOCAL OmniRoute gateway, so it means Node, `npm i -g omniroute`, a gateway key
+  of its own, free-tier provider keys in its dashboard, and autostart. Never a first-run
+  step. Do not confuse it with the `openrouter` backend: the names are one letter apart and
+  `free`'s model ids read `openrouter/...` because OmniRoute routes through it.
+- **Only if the user will not spend anything**: `openrouter` ($0, one key, no local setup,
+  but ~50 requests/day and a run spends 3-17 of them) or `nvidia` ($0 trial credits,
+  stronger models, churning catalog so `--list-models` first).
 
-Whichever tier the user sets up, add `"default_backend": "<name>"` to
+Until `free` itself is running, add `"default_backend": "<name>"` to
 `~/.claude/delegate.config.json` so the no-backend form below aims at the tier they actually
-have, instead of spending three connection failures on an absent local gateway.
+have, instead of spending three connection failures on an absent local gateway. Once the
+gateway is up, drop that line: `free` is the built-in default.
 See the [README](https://github.com/aayushpokhrel1/delegation-pipeline) for backends and keys.
 
 ## When to use

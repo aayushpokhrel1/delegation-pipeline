@@ -574,11 +574,29 @@ def test_fallback_skips_uncredentialed_hop():
             os.environ["DEEPSEEK_API_KEY"] = _saved
 
 
-def test_cold_start_help_mentions_all_three_exits():
+def test_cold_start_help_is_the_setup_guide_for_a_first_run():
+    """This text is the only setup instructions a newcomer reads, because a first run
+    fails before they have found the README. So it is asserted, not trusted: every exit
+    needs its own name, and a tier mentioned without a URL or env var is a dead end.
+
+    It also has to keep OmniRoute (the local `free` gateway) and OpenRouter (a remote
+    backend) distinguishable. They are one letter apart, `free`'s model ids read
+    `openrouter/...` because OmniRoute routes through it, and conflating them sends
+    someone installing Node to solve a missing API key."""
     cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
     help_text = delegate.cold_start_help(cfg, "free")
-    assert "npx --yes omniroute" in help_text, help_text
+    # The recommended tier leads, with a way to get a key.
+    assert "deepseek" in help_text, help_text
+    assert "platform.deepseek.com" in help_text, help_text
     assert "DEEPSEEK_API_KEY" in help_text, help_text
+    # The $0 exits, each with a signup URL.
+    assert "omniroute" in help_text, help_text
+    assert "openrouter.ai/keys" in help_text, help_text
+    assert "build.nvidia.com" in help_text, help_text
+    # OmniRoute is named as the local gateway, so it cannot read as OpenRouter.
+    assert "OmniRoute" in help_text and "LOCAL" in help_text, help_text
+    # And how to make the choice stick, since the skills name no backend.
+    assert "default_backend" in help_text, help_text
     assert delegate.CONFIG_PATH in help_text, help_text
 
 

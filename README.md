@@ -364,10 +364,12 @@ dies, because the one declared hop is `deepseek`. One line in
 `~/.claude/delegate.config.json` fixes it:
 
 ```json
-{ "default_backend": "openrouter" }
+{ "default_backend": "deepseek" }
 ```
 
 It accepts any configured backend name, and an explicitly named backend still wins over it.
+Drop the line once a local gateway is running, since `free` is the built-in default and
+`free` + `deepseek` (with its automatic escalation) is the setup this is designed around.
 
 - **free**: needs a local OmniRoute gateway *and*, on current OmniRoute (3.8.50+), an API
   key. Set up autostart (below) so the gateway is always there, then create a key at
