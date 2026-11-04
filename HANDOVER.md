@@ -7,8 +7,8 @@ holds what was done, in more detail.
 
 ## Where things stand (2026-11-04)
 
-- Plugin version `0.3.8`, which ships the onboarding work below; `0.3.6` was the last build
-  the plugin directory scanner accepted.
+- Plugin version `0.3.9`, which ships the onboarding work and the doc sweep below; `0.3.6`
+  was the last build the plugin directory scanner accepted.
 - `GETTING-STARTED.md` is new: the from-nothing path for a newcomer on Windows. Written for
   a first external user, and dry-run end to end (unconfigured, minimal config, bad
   `default_backend`) rather than written from memory. It recommends `deepseek` first and
@@ -17,15 +17,20 @@ holds what was done, in more detail.
 - `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
   It exists because the skills say to name no backend, so on a machine with no local gateway
   every delegation died after three connection failures.
-- 53 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
+- 54 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
   until 2026-11-01: `TemporaryDirectory` cleanup raised on git's read-only files under
   Windows and killed the run at 35 checks, with nothing actually broken. Fixed at
   `_temp_repo_dir()` in `test_delegate.py`.
 - `free` is the default path and works: gateway up, `free.model` is
   `mistral/codestral-latest` in `~/.claude/delegate.config.json` (backup at
   `delegate.config.json.bak`), two spares behind it.
-- `delegate --stats` is no longer warning about any tier. The ledger holds 159 runs and
-  its newest is 2026-10-26, so nothing has been delegated in the last week.
+- `delegate --stats` is not warning about any tier. The ledger holds 170 successful runs
+  (203 lines, the rest failed attempts), newest 2026-11-04.
+- The plugin directory listing is **in review**, with validation and policy warnings about
+  reading an API key from the environment. Installing from the repo
+  (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`) does not depend on
+  that review and works now. The decision not to restructure the credential read is
+  recorded at `resolve_backend()` in `delegate.py`, where someone would otherwise "fix" it.
 - OmniRoute is as last left: `cerebras` `isActive: false`, global and per-connection
   `proxyEnabled: true`.
 

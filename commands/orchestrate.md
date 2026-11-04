@@ -15,8 +15,9 @@ Work to orchestrate: `$ARGUMENTS`
 - **You (orchestrator)** = Claude Opus. The only component that spends Claude tokens.
 - **Tier B** = the delegation pipeline (`~/.claude/bin/delegate`, backends `free` / `deepseek`
   / `nvidia` / `openrouter`). Zero Claude tokens. **Default tier for both implementation and
-  review.** Only `free` (OmniRoute) is $0-unlimited local; `nvidia` / `deepseek` /
-  `openrouter` are remote (credits, or free-with-daily-limits).
+  review.** `free` (OmniRoute) is the only local tier and has no spend cap, though it is
+  not unlimited: its pool drains under load. `nvidia` / `deepseek` / `openrouter` are
+  remote (credits, or free-with-daily-limits).
 - **Tier A** = Claude subagents (the Agent tool: `haiku` / `sonnet` / `opus`). Costs Claude
   tokens. Escape hatch only.
 
@@ -41,9 +42,10 @@ default to `free` and escalate to `deepseek` itself. Measured on `bench/tasks.js
 the less reliable tier, not the weaker one, and hand-routing by difficulty is what left it
 unused. Name a backend only for the specific jobs below.
 
-- **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you (`--model
-  auto/coding`, or `auto/cheap` for high volume). Slow; the pool drains under sustained
-  load, which the spare model ids and the automatic escalation now cover.
+- **`free` (OmniRoute, $0 local, no spend cap but not unlimited):** the default, applied for
+  you (`--model auto/coding`, or `auto/cheap` for high volume). Slow, and the pool drains
+  under sustained load (`403 insufficient_quota` / `429`), which the spare model ids and the
+  automatic escalation cover.
 - **`openrouter` ($0 `:free`, rate-limited):** the **free-remote fallback** when OmniRoute is
   dry, preferred over `nvidia` so nvidia's finite credits stay in reserve; and the **pin
   lever** for a specific fast/quality free model, one not on the nvidia account, or a
@@ -75,8 +77,9 @@ description, which is why one-liners and edits smaller than their own spec stay 
    yourself, cheaply. Save it to `brief.md` (or a per-task file) so the review step can cite it.
 2. **Check the tree.** `git status --short`. If there are unrelated uncommitted changes, note
    them so the worker's diff stays attributable (offer to stash, do not stash without asking).
-3. **Run it.** Name no backend: the CLI defaults to `free` and falls back to `deepseek` by
-   itself, so there is no tier to route. Hand off with verify + commit so you get back a
+3. **Run it.** Name no backend: the CLI runs the machine's default tier (`free`, or whatever
+   `default_backend` is set to in `~/.claude/delegate.config.json`) and falls back to
+   `deepseek` by itself, so there is no tier to route. Hand off with verify + commit so you get back a
    tested, committed result:
    ```bash
    ~/.claude/bin/delegate \

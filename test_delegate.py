@@ -574,6 +574,30 @@ def test_fallback_skips_uncredentialed_hop():
             os.environ["DEEPSEEK_API_KEY"] = _saved
 
 
+def test_no_doc_calls_the_free_tier_unlimited():
+    """The `free` tier has no spend cap, which is not the same as unlimited: its pool
+    drains under sustained load and the whole escalation chain exists because of that.
+
+    Asserted because on 2026-11-04 three shipped instruction files called it "unlimited"
+    while the README two directories over documented the opposite, and a skill is live
+    guidance in every session rather than prose someone might read. The optimistic
+    adjective is the one duplication drifts toward, so pin it instead of asking future
+    readers to be careful. Say "no spend cap" if that is what you mean.
+
+    The scan is per-line, so an allowed "not unlimited" has to sit on one line; if this
+    trips on a correct sentence, rewrap the sentence rather than loosening the check."""
+    import glob
+    offenders = []
+    for path in (glob.glob("*.md") + glob.glob("skills/*/SKILL.md")
+                 + glob.glob("commands/*.md") + glob.glob("bench/*.md")):
+        with open(path, encoding="utf-8") as f:
+            for n, line in enumerate(f, 1):
+                low = line.lower()
+                if "unlimited" in low and "not unlimited" not in low:
+                    offenders.append("%s:%d: %s" % (path, n, line.strip()))
+    assert not offenders, "the free tier is not unlimited: " + "; ".join(offenders)
+
+
 def test_cold_start_help_is_the_setup_guide_for_a_first_run():
     """This text is the only setup instructions a newcomer reads, because a first run
     fails before they have found the README. So it is asserted, not trusted: every exit

@@ -321,6 +321,19 @@ def cold_start_help(cfg, name):
 
 
 def resolve_backend(cfg, name):
+    """Resolve a backend's config and credential.
+
+    DO NOT move this credential read to a plugin `user_config` value. The Claude Code
+    plugin directory's scanner flags these two lines ("reads a credential from the user's
+    environment and could send it to a server"), and the suggested remedy does not apply
+    here twice over. Mechanically, `${user_config.KEY}` only interpolates into
+    plugin-managed config (hooks, MCP servers, commands); the worker is invoked through
+    Bash and the plugin's one hook never touches a key, so there is no path to inject one.
+    Substantively, each key is sent only to the host named beside it in the same config
+    block, which is the "host's own vendor" case a reviewer confirms by hand (see
+    PRIVACY.md). Reading from the environment is also a documented feature. 2026-11-04:
+    the decision was to answer the reviewer, not to remove it.
+    """
     if name not in cfg["backends"]:
         die(f"Unknown backend '{name}'. Known: {', '.join(cfg['backends'])}")
     b = dict(cfg["backends"][name])

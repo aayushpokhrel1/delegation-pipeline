@@ -16,7 +16,8 @@ thing as the task and **you choose the backend and model yourself** based on the
 
 **Do not hand-route by difficulty** (the gate is a tight, verifiable spec, not low
 difficulty):
-- **Backend: omit it.** The CLI defaults to `free` ($0), tries that tier's spare model ids
+- **Backend: omit it.** The CLI runs the machine's default tier (`free` ($0), or whatever
+  `default_backend` names in `~/.claude/delegate.config.json`), tries that tier's spare model ids
   if one is dead, then escalates once to `deepseek` if `free` cannot be reached, which is measured to cost the same to review as a paid
   worker's diff. Name a backend only for a reason: `deepseek` when the task must not be
   retried from scratch or when pinning `--model` (pinning disables escalation);

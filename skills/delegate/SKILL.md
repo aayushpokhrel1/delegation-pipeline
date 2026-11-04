@@ -74,7 +74,8 @@ can't be specified in isolation, one-liners (the spec would cost more tokens tha
 ~/.claude/bin/delegate [backend] [--model <id>] "<task>"
 ```
 
-The backend is optional and defaults to `free`. On failure it tries the tier's spare model
+The backend is optional and defaults to `free`, or to whatever `default_backend` names in
+`~/.claude/delegate.config.json`. On failure it tries the tier's spare model
 ids (`models` in the backend's config) and then escalates once to `deepseek`.
 Every attempt lands in the ledger, the failed one with `"ok": false` and `"escalated_to"`, so
 a dry tier leaves a trace instead of looking like a tier nobody routed to.

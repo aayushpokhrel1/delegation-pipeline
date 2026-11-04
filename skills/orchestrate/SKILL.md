@@ -15,8 +15,9 @@ itself.
   tokens. Holds the plan, writes each brief, routes each task, adjudicates reviews.
 - **Tier B** = the delegation pipeline (`~/.claude/bin/delegate`, `free` / `deepseek` /
   `nvidia` / `openrouter`). Zero Claude tokens. **Default tier for both implementation and
-  review.** `free` (OmniRoute) is the only $0-unlimited local tier; `nvidia` / `deepseek` /
-  `openrouter` are remote (credits, or free-with-daily-limits).
+  review.** `free` (OmniRoute) is the only local tier and has no spend cap, though it is
+  not unlimited: its pool drains under load. `nvidia` / `deepseek` / `openrouter` are
+  remote (credits, or free-with-daily-limits).
 - **Tier A** = Claude subagents (Agent tool: `haiku` / `sonnet` / `opus`). Costs Claude
   tokens. Escape hatch only.
 
@@ -40,9 +41,9 @@ default to `free` and escalate to `deepseek` itself. Measured on `bench/tasks.js
 the less reliable tier, not the weaker one, and hand-routing by difficulty is what left it
 unused. Name a backend only for the specific jobs below:
 
-- **`free` (OmniRoute, $0 local, unlimited):** the default, applied for you. Slow; the pool
-  drains under sustained load, which the spare model ids and the automatic escalation now
-  cover. Name it explicitly
+- **`free` (OmniRoute, $0 local, no spend cap but not unlimited):** the default, applied for
+  you. Slow, and the pool drains under sustained load (`403 insufficient_quota` / `429`),
+  which the spare model ids and the automatic escalation cover. Name it explicitly
   only to force $0 and fail rather than fall back.
 - **`openrouter` ($0 `:free`, rate-limited):** two jobs. (1) **free-remote fallback** when
   OmniRoute is dry, preferred over `nvidia` so nvidia's finite credits stay in reserve.
@@ -79,7 +80,8 @@ saves tokens when the work is bulkier than its description, so one-liners stay i
    ```
    ~/.claude/bin/delegate --verify "<test/typecheck cmd>" --commit "<msg>, per brief" "<brief>"
    ```
-   Name no backend: it defaults to `free` and falls back to `deepseek` by itself.
+   Name no backend: it runs the machine's default tier (`free`, or whatever `default_backend`
+   names in `~/.claude/delegate.config.json`) and falls back to `deepseek` by itself.
    `--verify` runs after editing; a non-zero exit prints output and exits 2 without
    committing. **Exit 3 means the worker edited nothing**, so verify was not run at all:
    that is a brief it could not act on, not a test failure. `--commit` fires only on green.

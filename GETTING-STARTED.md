@@ -61,7 +61,8 @@ yet**, so your first delegation fails until you do this.
 
 Use **deepseek**. It is not free, but:
 
-- ~$0.28 per million tokens, so **$5 lasts a very long time** for this kind of work
+- ~$0.28 per million tokens. For scale, this project's own ledger has spent **$24.84 across
+  144 deepseek runs** and 88.7M tokens, so **$5 is roughly 25 to 30 real delegations**
 - roughly Sonnet-class, which means it can be trusted with a real module or a refactor,
   not just boilerplate
 - **several times faster than the free tiers.** Measured on the same small task: 28 seconds

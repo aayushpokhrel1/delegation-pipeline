@@ -96,22 +96,23 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-11-03 from 169 delegated runs across 6 repos._
+_Generated 2026-11-04 from 170 delegated runs across 7 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 169 |
-| Tokens offloaded to workers | 89,640,254 (measured) |
-| Worker API calls | 2,830 |
+| Runs delegated | 170 |
+| Tokens offloaded to workers | 89,645,927 (measured) |
+| Worker API calls | 2,834 |
 | Paid on the worker tier | $24.84 |
-| Claude tokens avoided | ~76,732,057 (estimated) |
-| Opus-equivalent value | ~$1150.98 |
+| Claude tokens avoided | ~76,736,914 (estimated) |
+| Opus-equivalent value | ~$1151.05 |
 
 By backend:
 
 ```
-deepseek  ████████████████████   99%   88,718,616 tokens
-free      ░░░░░░░░░░░░░░░░░░░░    1%   921,638 tokens
+deepseek    ████████████████████   99%   88,718,616 tokens
+free        ░░░░░░░░░░░░░░░░░░░░    1%   921,638 tokens
+openrouter  ░░░░░░░░░░░░░░░░░░░░    0%   5,673 tokens
 ```
 
 By month:
@@ -119,7 +120,7 @@ By month:
 ```
 2026-09  ██████░░░░░░░░░░░░░░   20,873,682 tokens
 2026-10  ████████████████████   64,402,445 tokens
-2026-11  █░░░░░░░░░░░░░░░░░░░   4,364,127 tokens
+2026-11  █░░░░░░░░░░░░░░░░░░░   4,369,800 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
@@ -357,19 +358,19 @@ at, which is what you want while developing this repo and nothing you need other
 
 ### Keys
 
-**Whichever tier you set up, name it as the default.** The skills tell the orchestrator to
-delegate without naming a backend, and the built-in default is `free`, the local gateway. On
-a machine without that gateway every such call spends three connection failures and then
-dies, because the one declared hop is `deepseek`. One line in
-`~/.claude/delegate.config.json` fixes it:
+**Until a local gateway is running, name your tier as the default.** The built-in default is
+`free`, the local gateway, and the skills tell the orchestrator to delegate without naming a
+backend, so on a machine without that gateway every call dies on an endpoint nothing is
+serving (the full reasoning is at `resolve_positionals()` in `delegate.py`). One line in
+`~/.claude/delegate.config.json`:
 
 ```json
 { "default_backend": "deepseek" }
 ```
 
-It accepts any configured backend name, and an explicitly named backend still wins over it.
-Drop the line once a local gateway is running, since `free` is the built-in default and
-`free` + `deepseek` (with its automatic escalation) is the setup this is designed around.
+Any configured backend name works, and an explicitly named backend still wins over it. Drop
+the line once the gateway is up: `free` + `deepseek`, with its automatic escalation, is the
+setup this is designed around.
 
 - **free**: needs a local OmniRoute gateway *and*, on current OmniRoute (3.8.50+), an API
   key. Set up autostart (below) so the gateway is always there, then create a key at
