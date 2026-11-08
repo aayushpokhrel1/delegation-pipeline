@@ -278,6 +278,28 @@ def test_stats_markdown_publishes_range():
     assert "python delegate.py --stats --ledger bench/ledger-snapshot.jsonl" in md, md
 
 
+def test_task_installers_register_a_windowless_action():
+    """A task action of powershell.exe or a .cmd flashes a console window on the desktop
+    every time it fires, because Task Scheduler creates the console for a task running as
+    the logged-on user before -WindowStyle Hidden is applied. Both installers must go
+    through run-hidden.vbs instead. This is a test rather than a comment because the
+    comment was already there, in the form of -WindowStyle Hidden, and read as if it
+    worked."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name in ("install-autostart.ps1", "install-stats-task.ps1"):
+        path = os.path.join(here, "scripts", name)
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+        assert 'New-ScheduledTaskAction -Execute "wscript.exe"' in text, name
+        assert "run-hidden.vbs" in text, name
+        assert '-Execute "powershell.exe"' not in text, name
+    launcher = os.path.join(here, "scripts", "run-hidden.vbs")
+    with open(launcher, "r", encoding="utf-8") as f:
+        vbs = f.read()
+    # Window style 0, and Wait=True so the task still records the child's exit code.
+    assert "sh.Run(cmd, 0, True)" in vbs
+
+
 def test_bench_constants_match_results_file():
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "bench", "RESULTS.md")

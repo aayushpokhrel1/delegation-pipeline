@@ -17,7 +17,7 @@ holds what was done, in more detail.
 - `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
   It exists because the skills say to name no backend, so on a machine with no local gateway
   every delegation died after three connection failures.
-- 54 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
+- 55 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
   until 2026-11-01: `TemporaryDirectory` cleanup raised on git's read-only files under
   Windows and killed the run at 35 checks, with nothing actually broken. Fixed at
   `_temp_repo_dir()` in `test_delegate.py`.
@@ -35,9 +35,10 @@ holds what was done, in more detail.
   global and per-connection `proxyEnabled: true`.
 - The `OmniRoute Gateway` and `Delegate Stats Refresh` tasks were repointed through
   `scripts/run-hidden.vbs` by hand on 2026-11-08 and the installers were changed to match,
-  so re-running them is a no-op. Verified: both live actions are the `wscript.exe` form and
-  the 11:22 firing opened no window. 54 checks, version `0.3.9` and the 170-run ledger were
-  re-measured the same day and were already correct here.
+  so re-running them is a no-op, and a check pins the installers to the windowless form.
+  Verified: both live actions are the `wscript.exe` form and the 11:22 firing opened no
+  window. Version `0.3.9` and the 170-run ledger were re-measured the same day and were
+  already correct here.
 
 ## Next
 
