@@ -20,8 +20,18 @@ $Starter  = Join-Path $ScriptDir "start-omniroute.ps1"
 
 if (-not (Test-Path $Starter)) { Write-Error "Missing $Starter"; exit 1 }
 
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$Starter`""
+# Launched through run-hidden.vbs, which gives the task no console window at all. A task
+# registered under the logged-on user pops a real terminal on the desktop every time its
+# action is powershell.exe or a .cmd, and -WindowStyle Hidden does not prevent it: the
+# console exists before the style is applied, so it still flashes. See run-hidden.vbs for
+# why this and not an S4U principal. The installed copy is used, not this checkout's, so
+# moving the checkout does not break the launcher.
+$Hidden = Join-Path $HOME ".local\bin\run-hidden.vbs"
+New-Item -ItemType Directory -Force -Path (Split-Path $Hidden) | Out-Null
+Copy-Item (Join-Path $ScriptDir "run-hidden.vbs") $Hidden -Force
+
+$action = New-ScheduledTaskAction -Execute "wscript.exe" `
+    -Argument ('"{0}" "powershell.exe" "-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "{1}"' -f $Hidden, $Starter)
 
 # Two triggers. At logon, plus a short delay so the network is up...
 $logonTrigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME

@@ -5,7 +5,7 @@ month. If yes it belongs in `README.md`, `MODELS.md`, `bench/README.md`, a comme
 code, or the vault, per `CLAUDE.md`. Do not grow this into a narrative: `git log` already
 holds what was done, in more detail.
 
-## Where things stand (2026-11-04)
+## Where things stand (2026-11-08)
 
 - Plugin version `0.3.9`, which ships the onboarding work and the doc sweep below; `0.3.6`
   was the last build the plugin directory scanner accepted.
@@ -31,8 +31,13 @@ holds what was done, in more detail.
   (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`) does not depend on
   that review and works now. The decision not to restructure the credential read is
   recorded at `resolve_backend()` in `delegate.py`, where someone would otherwise "fix" it.
-- OmniRoute is as last left: `cerebras` `isActive: false`, global and per-connection
-  `proxyEnabled: true`.
+- OmniRoute is as last left (not re-checked on 2026-11-08): `cerebras` `isActive: false`,
+  global and per-connection `proxyEnabled: true`.
+- The `OmniRoute Gateway` and `Delegate Stats Refresh` tasks were repointed through
+  `scripts/run-hidden.vbs` by hand on 2026-11-08 and the installers were changed to match,
+  so re-running them is a no-op. Verified: both live actions are the `wscript.exe` form and
+  the 11:22 firing opened no window. 54 checks, version `0.3.9` and the 170-run ledger were
+  re-measured the same day and were already correct here.
 
 ## Next
 

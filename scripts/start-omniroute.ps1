@@ -1,5 +1,7 @@
-# Starts the OmniRoute gateway if it isn't already running. Idempotent and hidden.
+# Starts the OmniRoute gateway if it isn't already running. Idempotent.
 # Called by the autostart scheduled task, or run manually to launch the gateway.
+# The task runs this through run-hidden.vbs, so this script has no console window of its
+# own; the WindowStyle Hidden below is for the gateway child process, a separate thing.
 $ErrorActionPreference = "SilentlyContinue"
 
 $Port = 20128

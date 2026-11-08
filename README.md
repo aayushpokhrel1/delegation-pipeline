@@ -451,13 +451,16 @@ a server that comes up fine seconds later. Treat that warning as noise, and chec
 `curl http://127.0.0.1:20128/api/monitoring/health` instead.
 
 Because the warm-up waits out that compile, a cold `start-omniroute.ps1` can take a few
-minutes before it exits. That is fine for a hidden logon task where nobody is waiting, and it
-is the whole point: the task eats the latency so your sessions never do.
+minutes before it exits. That is fine for a windowless background task where nobody is
+waiting, and it is the whole point: the task eats the latency so your sessions never do.
 
 The Windows task runs the starter *from this repo's path*, so moving or renaming the checkout
 breaks autostart. Re-run `install-autostart.ps1` afterwards.
 
-**Windows** (Scheduled Task, launches hidden at logon):
+**Windows** (Scheduled Task, at logon and every 15 minutes, with no console window:
+it runs through `scripts/run-hidden.vbs`, which the installer copies to
+`~/.local/bin`, because a task pointed straight at `powershell.exe` flashes a terminal
+on the desktop every time it fires):
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
 Start-ScheduledTask -TaskName "OmniRoute Gateway"                 # start now, no reboot
