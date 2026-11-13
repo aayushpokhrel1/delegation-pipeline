@@ -8,3 +8,8 @@ graphify-out/graph.json merge=graphify
 # The published ledger snapshot is written with LF by write_snapshot(); keeping it
 # LF in the worktree too stops every refresh from producing a line-ending-only diff.
 *.jsonl text eol=lf
+
+# directory-plugin/ is generated with LF; test_delegate.py compares it byte for byte.
+directory-plugin/**/*.md text eol=lf
+directory-plugin/**/*.json text eol=lf
+directory-plugin/README.md text eol=lf

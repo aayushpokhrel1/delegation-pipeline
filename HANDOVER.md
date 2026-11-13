@@ -26,11 +26,11 @@ holds what was done, in more detail.
   `delegate.config.json.bak`), two spares behind it.
 - `delegate --stats` is not warning about any tier. The ledger holds 170 successful runs
   (203 lines, the rest failed attempts), newest 2026-11-04.
-- The plugin directory listing is **in review**, with validation and policy warnings about
-  reading an API key from the environment. Installing from the repo
-  (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`) does not depend on
-  that review and works now. The decision not to restructure the credential read is
-  recorded at `resolve_backend()` in `delegate.py`, where someone would otherwise "fix" it.
+- The directory **refused** `0.3.9` (unverified org: no hooks, no `allowed-tools` beyond
+  Read/Grep/Glob/LS, no scripts). There is no application for Verified status. Next step:
+  submit the `directory-plugin/` subfolder (instructions only, generated) as a new version.
+  Installing from the repo (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`)
+  does not depend on the directory and works now.
 - OmniRoute is as last left (not re-checked on 2026-11-08): `cerebras` `isActive: false`,
   global and per-connection `proxyEnabled: true`.
 - The `OmniRoute Gateway` and `Delegate Stats Refresh` tasks were repointed through

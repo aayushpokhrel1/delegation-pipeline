@@ -1,0 +1,73 @@
+---
+description: Hand a task to a free/cheap worker (defaults to free, escalates to deepseek on failure), then review its diff
+argument-hint: [free|nvidia|openrouter|deepseek|kimi (optional, defaults to free)] <task description>
+---
+
+You are the orchestrator. Offload the task below to a cheap/free headless worker via the
+`delegate` tool, then review its work. The goal is to spend as little of the paid session's
+usage as possible on the grunt work itself.
+
+Arguments: `$ARGUMENTS`
+
+If the first whitespace-delimited token is a known backend (`free`, `nvidia`, `openrouter`,
+`deepseek`, `kimi`), use it and treat the rest as the **task**. Otherwise treat the whole
+thing as the task and **you choose the backend and model yourself** based on the task.
+
+**Do not hand-route by difficulty** (the gate is a tight, verifiable spec, not low
+difficulty):
+- **Backend: omit it.** The CLI runs the machine's default tier (`free` ($0), or whatever
+  `default_backend` names in `~/.claude/delegate.config.json`), tries that tier's spare model ids
+  if one is dead, then escalates once to `deepseek` if `free` cannot be reached, which is measured to cost the same to review as a paid
+  worker's diff. Name a backend only for a reason: `deepseek` when the task must not be
+  retried from scratch or when pinning `--model` (pinning disables escalation);
+  `openrouter` to **pin** a specific fast `:free` or vision model (`:free` ids are
+  rate-limited, ~50 req/day at $0); `nvidia` for a stronger free model than a `:free` id
+  gives; `kimi` only if the user asked.
+- **Model (mainly for `nvidia` / `openrouter`):** pass `--model <id>` matched to the task.
+  Read `MODELS.md` in this repo for the task->model shortlist, and run
+  `~/.claude/bin/delegate <backend> --list-models` to see the live catalog. Only pick
+  tool-calling-capable models (the worker edits via function calls); when unsure, use the
+  backend default. Current `nvidia` default: `nvidia/nemotron-3-super-120b-a12b` (verified
+  tool-calling); avoid `deepseek-ai/deepseek-v4-flash-0731` (hangs on this account).
+  OpenRouter free ids carry a `:free` suffix. The catalog changes, so `--list-models` if a
+  pick 404s or 410s.
+- **Images / vision:** if the task involves an image (a mockup, screenshot, diagram), pass
+  `--image <path|url>` (repeatable) and a **vision-capable** model, e.g.
+  `openrouter --model inclusionai/ling-3.0-flash-vl:free --image mockup.png`. The worker can
+  also fetch images itself mid-task via its `view_image` tool.
+
+State which backend and model you chose and why in one line before running.
+
+Follow this protocol:
+
+1. **Check the tree is clean-ish.** Run `git status --short`. If there are unrelated
+   uncommitted changes, note them so the worker's diff stays attributable (offer to stash,
+   don't stash without asking).
+2. **Write a tight spec.** The worker has zero conversation context, so expand the task
+   into a self-contained instruction: name the exact files, describe the change precisely,
+   and point at a pattern to mirror if one exists. Do this reasoning yourself, cheaply.
+3. **Run the worker** with your chosen backend and (optionally) model:
+   ```
+   ~/.claude/bin/delegate [backend] [--model <id>] "<your expanded self-contained instruction>"
+   ```
+   Its step logs go to stderr and its summary to stdout. A `free` worker can run for
+   minutes (the free model is the slow part), so give the run a long foreground timeout
+   (up to ~600000ms / 10min on the Bash tool) so it completes in the foreground and you get
+   the summary directly. If it still gets detached to the background at a shorter default,
+   the worker keeps running and its writes land normally, but confirm the run actually
+   finished before reviewing, or you may read a half-applied tree.
+4. **Review.** Run `git diff` and actually read the changes. The worker cannot run shell,
+   tests, or git, so verify correctness yourself. Fix small issues inline with Edit;
+   re-delegate with a sharper spec if it drifted badly.
+5. **Report** what changed, what you corrected, and anything the user should verify or that
+   still needs tests run / a commit (you don't commit unless asked).
+
+Do NOT delegate design decisions, tricky debugging, or security-sensitive code: handle
+those in-session. If `delegate` errors that a backend needs a key or that OmniRoute isn't
+running (for `free`), relay the fix instead of retrying blindly.
+
+To get a tested, committed result back in one shot, add `--verify "<cmd>" --commit "<msg>"`:
+the CLI runs the command after the worker edits and commits only on a zero exit (a failing
+verify exits 2 and commits nothing; exit 3 means the worker edited nothing, so verify was
+never run and the task simply did not happen). The worker model still never runs shell or git. For
+routing a whole plan across the delegation pipeline and Claude subagents, use `/orchestrate`.

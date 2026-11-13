@@ -21,6 +21,7 @@ Rules:
 | `PRIVACY.md` | What leaves the machine and where it goes. The directory listing's `privacyPolicyUrl` points here, so a reviewer reads it. It duplicates the README's "What this sends, and where" table on purpose; **change both or neither**, since the endpoint list is the part that rots |
 | `.claude-plugin/plugin.json` | The manifest, plus the directory listing fields (`icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`). `version` is the cache key: bump it or nobody receives the change |
 | `hooks/hooks.json`, `scripts/ensure_launcher.py` | Why a plugin-only install works. The hook writes `~/.claude/bin/delegate` pointing at the plugin's own copy, and deliberately leaves a launcher alone when it points at a checkout that still exists |
+| `directory-plugin/`, `scripts/build_directory_plugin.py` | The instructions-only copy submitted to the Claude plugin directory, which refuses hooks, `allowed-tools` and scripts from unverified orgs. **Generated** from `skills/` and `commands/`: never edit it, rebuild it. A test fails when it is stale |
 | `HANDOVER.md` | Current state and what is next, nothing durable. See the note below |
 | `CLAUDE.md` | This file |
 

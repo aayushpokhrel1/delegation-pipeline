@@ -1004,6 +1004,29 @@ def test_a_dead_model_id_retries_the_next_one_in_the_tier():
     assert "deepseek" not in out, "must exhaust the tier's models before hopping"
 
 
+def test_directory_plugin_is_current_and_policy_clean():
+    # directory-plugin/ is what the Claude plugin directory accepts from an unverified org:
+    # no hooks, no allowed-tools, only text/JSON/images. It is generated, so a stale copy
+    # (someone edited skills/ and forgot to rebuild) fails here.
+    import build_directory_plugin as bdp
+    committed = os.path.join(os.path.dirname(os.path.abspath(__file__)), "directory-plugin")
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh = os.path.join(tmp, "out")
+        bdp.build(fresh)
+        for dirpath, _, files in os.walk(fresh):
+            for name in files:
+                rel = os.path.relpath(os.path.join(dirpath, name), fresh)
+                assert name.endswith((".md", ".json", ".png")) or name == "LICENSE", rel
+                with open(os.path.join(fresh, rel), "rb") as f:
+                    new = f.read()
+                assert b"allowed-tools" not in new and not new.startswith(b"#!"), rel
+                with open(os.path.join(committed, rel), "rb") as f:
+                    assert f.read() == new, f"directory-plugin/{rel} is stale: run scripts/build_directory_plugin.py"
+        n_fresh = sum(len(f) for _, _, f in os.walk(fresh))
+        n_committed = sum(len(f) for _, _, f in os.walk(committed))
+        assert n_fresh == n_committed, "directory-plugin/ has extra files: rebuild it"
+
+
 if __name__ == "__main__":
     # The count is printed because a suite that stops early still prints a wall of
     # "ok" lines: on 2026-10-31 a teardown error ended the run at 35 of 52 checks
