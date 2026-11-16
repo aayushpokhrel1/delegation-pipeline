@@ -96,21 +96,21 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-11-11 from 184 delegated runs across 9 repos._
+_Generated 2026-11-16 from 185 delegated runs across 10 repos._
 
 | Metric | Value |
 | --- | --- |
-| Runs delegated | 184 |
-| Tokens offloaded to workers | 96,455,089 (measured) |
-| Worker API calls | 3,030 |
-| Paid on the worker tier | $26.69 |
-| Claude tokens avoided | ~82,565,556 (estimated) |
-| Opus-equivalent value | ~$1238.48 |
+| Runs delegated | 185 |
+| Tokens offloaded to workers | 96,499,292 (measured) |
+| Worker API calls | 3,035 |
+| Paid on the worker tier | $26.70 |
+| Claude tokens avoided | ~82,603,394 (estimated) |
+| Opus-equivalent value | ~$1239.05 |
 
 By backend:
 
 ```
-deepseek    ████████████████████   99%   95,330,459 tokens
+deepseek    ████████████████████   99%   95,374,662 tokens
 free        ░░░░░░░░░░░░░░░░░░░░    1%   1,118,957 tokens
 openrouter  ░░░░░░░░░░░░░░░░░░░░    0%   5,673 tokens
 ```
@@ -120,7 +120,7 @@ By month:
 ```
 2026-09  ██████░░░░░░░░░░░░░░   20,873,682 tokens
 2026-10  ████████████████████   64,402,445 tokens
-2026-11  ███░░░░░░░░░░░░░░░░░   11,178,962 tokens
+2026-11  ███░░░░░░░░░░░░░░░░░   11,223,165 tokens
 ```
 
 Offloaded tokens and worker calls are measured from each backend's own usage
