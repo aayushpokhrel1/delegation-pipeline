@@ -7,7 +7,7 @@ holds what was done, in more detail.
 
 ## Where things stand (2026-11-08)
 
-- Plugin version `0.3.9`, which ships the onboarding work and the doc sweep below; `0.3.6`
+- Plugin version `0.3.10` (quoted command frontmatter); `0.3.9` ships the onboarding work and the doc sweep below; `0.3.6`
   was the last build the plugin directory scanner accepted.
 - `GETTING-STARTED.md` is new: the from-nothing path for a newcomer on Windows. Written for
   a first external user, and dry-run end to end (unconfigured, minimal config, bad

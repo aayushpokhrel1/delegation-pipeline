@@ -1,6 +1,6 @@
 ---
-description: Hand a task to a free/cheap worker (defaults to free, escalates to deepseek on failure), then review its diff
-argument-hint: [free|nvidia|openrouter|deepseek|kimi (optional, defaults to free)] <task description>
+description: "Hand a task to a free/cheap worker (defaults to free, escalates to deepseek on failure), then review its diff"
+argument-hint: "[free|nvidia|openrouter|deepseek|kimi (optional, defaults to free)] <task description>"
 allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git stash:*), Read, Edit
 ---
 

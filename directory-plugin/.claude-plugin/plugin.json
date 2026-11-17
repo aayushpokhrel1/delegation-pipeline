@@ -2,7 +2,7 @@
   "name": "delegation-pipeline",
   "displayName": "Delegation Pipeline",
   "description": "Offload token-heavy grunt work from your paid Claude session to free/cheap models. Spend Claude tokens on thinking, not typing. Instructions only: the worker CLI installs from the repo.",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "keywords": [
     "delegation",
     "token-optimization",
