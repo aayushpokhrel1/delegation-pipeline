@@ -4,8 +4,11 @@
 no service behind it, no account, and no server operated by its author. Nothing in this
 project reports to the author, and the author receives no data about you or your use of it.
 
-Last updated: 2026-10-02. This policy covers the `delegation-pipeline` plugin and the
-`delegate` worker it ships.
+Last updated: 2026-11-18. This policy covers the `delegation-pipeline` plugin, in both of its
+forms, and the `delegate` worker. The full plugin (installed from this repository's marketplace)
+ships the worker. The directory edition (the `directory-plugin/` folder) ships only skills and
+commands: it sends nothing and runs nothing itself, and the worker it tells Claude to use is
+installed separately from this repository.
 
 ## What the author collects
 
@@ -65,8 +68,9 @@ Two files, both under `~/.claude/`, both local and never transmitted:
   appear here. It exists so `delegate --stats` can show you what you have spent. Delete the
   file at any time to clear it; it is recreated on the next run.
 
-The plugin also writes `~/.claude/bin/delegate`, a launcher script, at the start of a Claude
-Code session.
+`~/.claude/bin/delegate` is a launcher script. The full plugin writes it at the start of a
+Claude Code session; with the directory edition, `install.sh` / `install.ps1` writes it when you
+run the installer. The directory edition writes nothing itself.
 
 Inside the repository you invoke it in, a **failed** run writes too: worker edits are
 all-or-nothing, so if the backend dies mid-run the tool restores the files it had changed
