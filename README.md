@@ -96,7 +96,7 @@ on your instructions.
 
 ### Measured impact
 
-_Generated 2026-11-16 from 185 delegated runs across 10 repos._
+_Generated 2026-11-23 from 185 delegated runs across 10 repos._
 
 | Metric | Value |
 | --- | --- |
