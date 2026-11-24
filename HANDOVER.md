@@ -9,7 +9,7 @@ holds what was done, in more detail.
 
 - `master` is level with `origin/master`, and CI (`.github/workflows/ci.yml`) is green on all
   four jobs: Linux and Windows, Python 3.8 and 3.14, 56 checks each.
-- Plugin version `0.3.10`. `0.3.6` was the last build the plugin directory scanner accepted.
+- Plugin version `0.3.10`, for both the full plugin and `directory-plugin/`.
 - The directory **refused** `0.3.9` (unverified org: no hooks, no `allowed-tools` beyond
   Read/Grep/Glob/LS, no scripts). There is no application for Verified status. The
   `directory-plugin/` subfolder (instructions only, generated) was submitted as a new

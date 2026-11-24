@@ -290,6 +290,12 @@ appears at the start of your next Claude Code session, with no clone and no inst
 It needs **Python 3.8+ on PATH**. Without it the hook writes nothing and there is no
 `delegate` to run, which is the single most common "I installed it and nothing happened".
 
+**From the Claude plugin directory instead?** That listing is the instructions-only edition
+([`directory-plugin/`](directory-plugin/)): the directory takes no hooks or scripts from
+unverified publishers, so it ships the commands and skills but not the worker. Add the worker
+with the [clone-based install](#clone-based-install), and do not also install the full plugin
+above, or the skills load twice.
+
 The backends still need their own setup, which is the one manual step: the `free` tier wants
 a local OmniRoute gateway running, and the remote tiers want an API key. See
 [Keys](#keys) and [Autostart](#autostart), or
