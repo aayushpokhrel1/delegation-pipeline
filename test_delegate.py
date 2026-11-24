@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Framework-free checks for delegate.py's pure helpers (no network). Run: python test_delegate.py"""
 import base64
+import contextlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -651,8 +653,9 @@ def test_cold_start_help_empty_for_remote_backend():
     assert delegate.cold_start_help(cfg, "deepseek") == ""
 
 
+@contextlib.contextmanager
 def _temp_repo_dir():
-    """A TemporaryDirectory for a git repo, whose cleanup is allowed to fail.
+    """A temp dir for a git repo, whose cleanup is allowed to fail.
 
     `git init` leaves read-only files under `.git`, and on Windows git can keep a
     handle open past the end of the test. Python 3.14's cleanup raises on both
@@ -661,8 +664,16 @@ def _temp_repo_dir():
     whole run down with it: on 2026-10-31 the suite stopped at 35 of 52 checks
     with nothing actually broken. A leaked temp dir is the OS's problem to sweep;
     a suite that cannot report its own result is ours.
+
+    Not TemporaryDirectory(ignore_cleanup_errors=True): that flag is 3.10+, and on
+    3.10 under Windows its cleanup recursed until RecursionError. rmtree with
+    ignore_errors never raises on any version, and CI runs the 3.8 floor.
     """
-    return tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    d = tempfile.mkdtemp()
+    try:
+        yield d
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def _init_temp_repo(d):

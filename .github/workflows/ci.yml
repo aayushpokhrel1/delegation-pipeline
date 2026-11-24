@@ -12,13 +12,19 @@ jobs:
       matrix:
         # Windows is not optional: on Python 3.14 the suite once died at 35 checks because
         # TemporaryDirectory cleanup hit git's read-only files (see _temp_repo_dir()).
-        os: [ubuntu-latest, windows-latest]
+        # 3.8 is the floor the README badge and installers claim; setup-python has no 3.8
+        # build for ubuntu-24.04, so that job pins 22.04.
+        include:
+          - { os: ubuntu-latest, python: "3.14" }
+          - { os: windows-latest, python: "3.14" }
+          - { os: ubuntu-22.04, python: "3.8" }
+          - { os: windows-latest, python: "3.8" }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
       # The suite commits in temp repos and sets its own identity there; this covers any
       # git call that runs before that.
       - run: |
