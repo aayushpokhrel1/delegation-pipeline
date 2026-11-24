@@ -784,11 +784,17 @@ def _run_main(argv, agent_result, verify_calls, cfg=None):
 
     saved = (sys.argv, delegate.agent_loop, delegate.run_verify,
              delegate.record_run, delegate.LEDGER_PATH, delegate.load_config)
+    if cfg is None:
+        # Never fall through to the real ~/.claude/delegate.config.json: these tests
+        # passed on a machine with a deepseek key there and exited 1 in CI, which has
+        # none. Built-in defaults plus a dummy key for every remote backend.
+        cfg = json.loads(json.dumps(delegate.DEFAULT_CONFIG))
+        for b in cfg["backends"].values():
+            b["api_key"] = "sk-test"
     out = io.StringIO()
     try:
         sys.argv = argv
-        if cfg is not None:
-            delegate.load_config = lambda: cfg
+        delegate.load_config = lambda: cfg
         delegate.agent_loop = (agent_result if callable(agent_result)
                                else lambda *a, **k: agent_result)
         # Records that verify ran at all; the point of the test is that it must not.

@@ -1363,8 +1363,11 @@ def agent_loop(backend, task, max_steps, timeout, image_uris=None, edited_paths=
                         if isinstance(raw_path, str) and raw_path:
                             try:
                                 resolved = safe_path(raw_path)
-                                edited_paths.add(
-                                    os.path.relpath(resolved, ROOT).replace(os.sep, "/"))
+                                # realpath(ROOT), not ROOT: safe_path() resolves, so an
+                                # unresolved ROOT with an 8.3 short name (Windows %TEMP%
+                                # is C:\Users\RUNNER~1\...) yields "../../runneradmin/...".
+                                edited_paths.add(os.path.relpath(
+                                    resolved, os.path.realpath(ROOT)).replace(os.sep, "/"))
                             except Exception:  # noqa: BLE001 - telemetry, never fatal
                                 pass
                 log(f"[step {step}] {name}({_brief(args)}) -> {(result.splitlines() or [''])[0][:120]}")
