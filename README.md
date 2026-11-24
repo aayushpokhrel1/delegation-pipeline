@@ -353,6 +353,10 @@ paths (`__pycache__/`, `graphify-out/`) land in the installed copy. Convenient w
 iterating, but it means a half-finished `SKILL.md` becomes live guidance, so finish an edit
 before reinstalling.
 
+**Tests:** `python test_delegate.py`. Stdlib only, and it needs no key, gateway or config of
+yours. [CI](.github/workflows/ci.yml) runs it on Linux and Windows under Python 3.8 and 3.14.
+It ends by printing the number of checks it ran, so a run that stopped early shows.
+
 **One piece, not two.** The plugin ships the commands, the skills, and the worker, and sets
 up its own launcher. A clone only changes which copy of `delegate.py` that launcher points
 at, which is what you want while developing this repo and nothing you need otherwise.

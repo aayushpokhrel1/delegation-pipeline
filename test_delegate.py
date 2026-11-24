@@ -11,6 +11,13 @@ import tempfile
 
 import delegate
 
+# Hermetic by construction: no test may read the developer's real config or write their
+# real ledger. Passing only on a machine with a deepseek key in the config is how two tests
+# hid until CI ran on a clean box. Tests that need either set their own.
+_SANDBOX = tempfile.mkdtemp()
+delegate.CONFIG_PATH = os.path.join(_SANDBOX, "delegate.config.json")
+delegate.LEDGER_PATH = os.path.join(_SANDBOX, "delegate-usage.jsonl")
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 import ensure_launcher
 

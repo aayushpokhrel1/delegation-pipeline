@@ -22,6 +22,7 @@ Rules:
 | `.claude-plugin/plugin.json` | The manifest, plus the directory listing fields (`icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`). `version` is the cache key: bump it or nobody receives the change |
 | `hooks/hooks.json`, `scripts/ensure_launcher.py` | Why a plugin-only install works. The hook writes `~/.claude/bin/delegate` pointing at the plugin's own copy, and deliberately leaves a launcher alone when it points at a checkout that still exists |
 | `directory-plugin/`, `scripts/build_directory_plugin.py` | The instructions-only copy submitted to the Claude plugin directory, which refuses hooks, `allowed-tools` and scripts from unverified orgs. **Generated** from `skills/` and `commands/`: never edit it, rebuild it. A test fails when it is stale |
+| `.github/workflows/ci.yml` | Runs `python test_delegate.py` on Linux and Windows, Python 3.8 (the floor the README and installers claim) and 3.14. That one suite also holds the invariants above (`REVIEW_RATIO` vs `bench/RESULTS.md`, `directory-plugin/` freshness), so there is no other verify step |
 | `HANDOVER.md` | Current state and what is next, nothing durable. See the note below |
 | `CLAUDE.md` | This file |
 

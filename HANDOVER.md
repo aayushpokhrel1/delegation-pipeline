@@ -5,27 +5,11 @@ month. If yes it belongs in `README.md`, `MODELS.md`, `bench/README.md`, a comme
 code, or the vault, per `CLAUDE.md`. Do not grow this into a narrative: `git log` already
 holds what was done, in more detail.
 
-## Where things stand (2026-11-08)
+## Where things stand (2026-11-24)
 
-- Plugin version `0.3.10` (quoted command frontmatter); `0.3.9` ships the onboarding work and the doc sweep below; `0.3.6`
-  was the last build the plugin directory scanner accepted.
-- `GETTING-STARTED.md` is new: the from-nothing path for a newcomer on Windows. Written for
-  a first external user, and dry-run end to end (unconfigured, minimal config, bad
-  `default_backend`) rather than written from memory. It recommends `deepseek` first and
-  `free` + `deepseek` as the destination, which is what the escalation chain was built for;
-  an earlier draft led with `openrouter` and quietly undercut that design.
-- `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
-  It exists because the skills say to name no backend, so on a machine with no local gateway
-  every delegation died after three connection failures.
-- 56 checks pass (`python test_delegate.py`), on Linux and Windows, Python 3.8 and 3.14, in CI (`.github/workflows/ci.yml`). The suite stopped reporting on Python 3.14
-  until 2026-11-01: `TemporaryDirectory` cleanup raised on git's read-only files under
-  Windows and killed the run at 35 checks, with nothing actually broken. Fixed at
-  `_temp_repo_dir()` in `test_delegate.py`.
-- `free` is the default path and works: gateway up, `free.model` is
-  `mistral/codestral-latest` in `~/.claude/delegate.config.json` (backup at
-  `delegate.config.json.bak`), two spares behind it.
-- `delegate --stats` is not warning about any tier. The ledger holds 170 successful runs
-  (203 lines, the rest failed attempts), newest 2026-11-04.
+- `master` is level with `origin/master`, and CI (`.github/workflows/ci.yml`) is green on all
+  four jobs: Linux and Windows, Python 3.8 and 3.14, 56 checks each.
+- Plugin version `0.3.10`. `0.3.6` was the last build the plugin directory scanner accepted.
 - The directory **refused** `0.3.9` (unverified org: no hooks, no `allowed-tools` beyond
   Read/Grep/Glob/LS, no scripts). There is no application for Verified status. The
   `directory-plugin/` subfolder (instructions only, generated) was submitted as a new
@@ -33,14 +17,14 @@ holds what was done, in more detail.
   repo-root submission was withdrawn.
   Installing from the repo (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`)
   does not depend on the directory and works now.
-- OmniRoute is as last left (not re-checked on 2026-11-08): `cerebras` `isActive: false`,
-  global and per-connection `proxyEnabled: true`.
-- The `OmniRoute Gateway` and `Delegate Stats Refresh` tasks were repointed through
-  `scripts/run-hidden.vbs` by hand on 2026-11-08 and the installers were changed to match,
-  so re-running them is a no-op, and a check pins the installers to the windowless form.
-  Verified: both live actions are the `wscript.exe` form and the 11:22 firing opened no
-  window. Version `0.3.9` and the 170-run ledger were re-measured the same day and were
-  already correct here.
+- `free` is the default path and works: gateway up, `free.model` is
+  `mistral/codestral-latest` in `~/.claude/delegate.config.json` (backup at
+  `delegate.config.json.bak`), with the two spares from `DEFAULT_CONFIG` behind it.
+- `delegate --stats` is not warning about any tier. The ledger holds 187 successful runs
+  (220 lines, the rest failed attempts), newest 2026-11-24. The README's generated block
+  says 185 because the stats task last ran 2026-11-23; the next run catches it up.
+- OmniRoute was last checked 2026-11-08: `cerebras` `isActive: false`, global and
+  per-connection `proxyEnabled: true`.
 
 ## Next
 
