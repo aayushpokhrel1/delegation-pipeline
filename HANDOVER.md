@@ -27,8 +27,10 @@ holds what was done, in more detail.
 - `delegate --stats` is not warning about any tier. The ledger holds 170 successful runs
   (203 lines, the rest failed attempts), newest 2026-11-04.
 - The directory **refused** `0.3.9` (unverified org: no hooks, no `allowed-tools` beyond
-  Read/Grep/Glob/LS, no scripts). There is no application for Verified status. Next step:
-  submit the `directory-plugin/` subfolder (instructions only, generated) as a new version.
+  Read/Grep/Glob/LS, no scripts). There is no application for Verified status. The
+  `directory-plugin/` subfolder (instructions only, generated) was submitted as a new
+  submission at `bb2fbfa`, Claude Code only, and is **in review** as of 2026-11-24; the old
+  repo-root submission was withdrawn.
   Installing from the repo (`claude plugin marketplace add aayushpokhrel1/delegation-pipeline`)
   does not depend on the directory and works now.
 - OmniRoute is as last left (not re-checked on 2026-11-08): `cerebras` `isActive: false`,
