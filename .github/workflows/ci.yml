@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is not optional: on Python 3.14 the suite once died at 35 checks because
+        # TemporaryDirectory cleanup hit git's read-only files (see _temp_repo_dir()).
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # The suite commits in temp repos and sets its own identity there; this covers any
+      # git call that runs before that.
+      - run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.com"
+      # Also covers the CLAUDE.md invariants: REVIEW_RATIO vs bench/RESULTS.md and the
+      # generated directory-plugin/ being fresh.
+      - run: python test_delegate.py

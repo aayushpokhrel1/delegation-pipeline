@@ -1,5 +1,6 @@
 # Delegation Pipeline
 
+[![CI](https://github.com/aayushpokhrel1/delegation-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/aayushpokhrel1/delegation-pipeline/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/aayushpokhrel1/delegation-pipeline?style=flat&logo=github)](https://github.com/aayushpokhrel1/delegation-pipeline/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)

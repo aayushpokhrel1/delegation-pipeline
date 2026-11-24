@@ -17,7 +17,7 @@ holds what was done, in more detail.
 - `default_backend` in `~/.claude/delegate.config.json` now chooses the no-backend tier.
   It exists because the skills say to name no backend, so on a machine with no local gateway
   every delegation died after three connection failures.
-- 55 checks pass (`python test_delegate.py`). The suite stopped reporting on Python 3.14
+- 56 checks pass (`python test_delegate.py`), on Linux and Windows in CI (`.github/workflows/ci.yml`). The suite stopped reporting on Python 3.14
   until 2026-11-01: `TemporaryDirectory` cleanup raised on git's read-only files under
   Windows and killed the run at 35 checks, with nothing actually broken. Fixed at
   `_temp_repo_dir()` in `test_delegate.py`.
